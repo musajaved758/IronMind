@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:operation_brotherhood/features/home/presentation/widgets/daily_summary_card.dart';
 import 'package:operation_brotherhood/features/home/presentation/widgets/habit_list_view.dart';
 import 'package:operation_brotherhood/features/home/presentation/widgets/time_line_widget.dart';
+import 'package:operation_brotherhood/features/habit/presentation/widgets/add_habit_dialog.dart';
 
 class HomeScreen extends HookConsumerWidget {
   const HomeScreen({super.key});
@@ -12,10 +13,18 @@ class HomeScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDate = useState(DateTime.now());
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => const AddHabitDialog(),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
       body: SafeArea(
         child: CustomScrollView(
           shrinkWrap: true,
-
           // crossAxisAlignment: CrossAxisAlignment.start,
           slivers: [
             SliverPadding(
@@ -36,11 +45,7 @@ class HomeScreen extends HookConsumerWidget {
                 bottom: 15,
               ),
               sliver: SliverToBoxAdapter(
-                child: DailySummaryCard(
-                  completedTask: 10,
-                  totalTask: 20,
-                  date: '06-02-2026',
-                ),
+                child: DailySummaryCard(selectedDate: selectedDate.value),
               ),
             ),
             SliverPadding(
@@ -50,7 +55,9 @@ class HomeScreen extends HookConsumerWidget {
                 right: 20,
                 bottom: 20,
               ),
-              sliver: HabitListView(),
+              sliver: SliverToBoxAdapter(
+                child: HabitListView(selectedDate: selectedDate.value),
+              ),
             ),
           ],
         ),

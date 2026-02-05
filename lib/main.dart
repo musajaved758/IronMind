@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:operation_brotherhood/core/utils/theme.dart';
 import 'package:operation_brotherhood/features/home/presentation/screens/home_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:operation_brotherhood/core/services/hive_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await HiveService.init();
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
