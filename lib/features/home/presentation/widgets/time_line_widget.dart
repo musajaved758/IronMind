@@ -76,7 +76,30 @@ class TimeLineWidget extends HookConsumerWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.fromBorderSide(border),
             ),
-            child: Column(
+            child: isCompleted ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  date.day.toString(),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),),
+                const SizedBox(height: 4),
+
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                  ),
+
+
+              ],
+            ) : Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
@@ -92,15 +115,6 @@ class TimeLineWidget extends HookConsumerWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (isCompleted)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Icon(
-                      Icons.check_circle,
-                      size: 10,
-                      color: Colors.white,
-                    ),
-                  ),
               ],
             ),
           ),
