@@ -14,6 +14,8 @@ class HiveService {
     await Hive.initFlutter();
     // Register Adapters
     Hive.registerAdapter(HabitModelAdapter());
+    Hive.registerAdapter(ChallengeSubtaskAdapter());
+    Hive.registerAdapter(ChallengeMilestoneAdapter());
     Hive.registerAdapter(ChallengeModelAdapter());
     // Open Boxes
     await Hive.openBox<HabitModel>(habitBoxName);

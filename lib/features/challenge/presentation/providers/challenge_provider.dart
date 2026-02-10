@@ -21,6 +21,7 @@ class ChallengeNotifier extends Notifier<List<ChallengeModel>> {
     required String consequenceType,
     required String specificConsequence,
     required DateTime startDate,
+    List<ChallengeMilestone> roadmap = const [],
   }) async {
     final newChallenge = ChallengeModel(
       id: const Uuid().v4(),
@@ -30,8 +31,68 @@ class ChallengeNotifier extends Notifier<List<ChallengeModel>> {
       consequenceType: consequenceType,
       specificConsequence: specificConsequence,
       startDate: DateTime(startDate.year, startDate.month, startDate.day),
+      roadmap: roadmap,
     );
     await HiveService.saveChallenge(newChallenge);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleMilestoneCompletion(
+    String challengeId,
+    String milestoneId,
+  ) async {
+    final challenge = state.firstWhere((c) => c.id == challengeId);
+    final updatedRoadmap = challenge.roadmap.map((m) {
+      if (m.id == milestoneId) {
+        return m.copyWith(isCompleted: !m.isCompleted);
+      }
+      return m;
+    }).toList();
+
+    final updatedChallenge = challenge.copyWith(roadmap: updatedRoadmap);
+    await HiveService.updateChallenge(updatedChallenge);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleSubtaskCompletion(
+    String challengeId,
+    String milestoneId,
+    String subtaskId,
+  ) async {
+    final challenge = state.firstWhere((c) => c.id == challengeId);
+    final updatedRoadmap = challenge.roadmap.map((m) {
+      if (m.id == milestoneId) {
+        final updatedSubtasks = m.subtasks.map((s) {
+          if (s.id == subtaskId) {
+            return s.copyWith(isCompleted: !s.isCompleted);
+          }
+          return s;
+        }).toList();
+        return m.copyWith(subtasks: updatedSubtasks);
+      }
+      return m;
+    }).toList();
+
+    final updatedChallenge = challenge.copyWith(roadmap: updatedRoadmap);
+    await HiveService.updateChallenge(updatedChallenge);
+    ref.invalidateSelf();
+  }
+
+  Future<void> updateSubtasks(
+    String challengeId,
+    String milestoneId,
+    List<ChallengeSubtask> subtasks,
+  ) async {
+    final challenge = state.firstWhere((c) => c.id == challengeId);
+    final updatedRoadmap = challenge.roadmap.map((m) {
+      if (m.id == milestoneId) {
+        return m.copyWith(subtasks: subtasks);
+      }
+      return m;
+    }).toList();
+
+    final updatedChallenge = challenge.copyWith(roadmap: updatedRoadmap);
+    await HiveService.updateChallenge(updatedChallenge);
     ref.invalidateSelf();
   }
 

@@ -114,17 +114,13 @@ class _ChallengesView extends HookConsumerWidget {
           const SizedBox(height: 20),
           _buildRadialProgress(stats),
           const SizedBox(height: 40),
-          _sectionHeader('PROGRESS OVER TIME'),
-          const SizedBox(height: 20),
-          _buildProgressChart(stats.completionHistory),
-          const SizedBox(height: 40),
           _sectionHeader('STREAK & CONSISTENCY'),
           const SizedBox(height: 20),
           _buildConsistencyInsight(stats),
           const SizedBox(height: 40),
-          _sectionHeader('ACTIVE CHALLENGES BREAKDOWN'),
+          _sectionHeader('PROGRESS OVER TIME'),
           const SizedBox(height: 20),
-          ...stats.activeChallenges.map((c) => _buildActiveItem(c)),
+          _buildProgressChart(stats.completionHistory),
           const SizedBox(height: 100), // Bottom padding
         ],
       ),
@@ -329,53 +325,6 @@ class _ChallengesView extends HookConsumerWidget {
       }),
     );
   }
-
-  Widget _buildActiveItem(dynamic challenge) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.habitSurface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                challenge.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                '${(challenge.progress * 100).toInt()}%',
-                style: const TextStyle(
-                  color: AppColors.habitPrimary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: challenge.progress,
-              backgroundColor: AppColors.habitBg,
-              color: AppColors.habitPrimary,
-              minHeight: 6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _HabitsView extends HookConsumerWidget {
@@ -391,7 +340,7 @@ class _HabitsView extends HookConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionHeader('HABIT COMPLETION OVERVIEW'),
-          const SizedBox(height: 20),
+          // const SizedBox(height: 20),
           Row(
             children: [
               Expanded(

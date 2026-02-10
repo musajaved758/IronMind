@@ -5,9 +5,13 @@ import 'package:operation_brotherhood/core/utils/colors.dart';
 import 'package:operation_brotherhood/core/utils/responsive.dart';
 import 'package:operation_brotherhood/features/habit/presentation/providers/habit_provider.dart';
 import 'package:operation_brotherhood/features/challenge/presentation/providers/challenge_provider.dart';
+import 'package:operation_brotherhood/features/challenge/data/models/challenge_model.dart';
+import 'package:uuid/uuid.dart';
 
 class HabitScreen extends HookConsumerWidget {
-  const HabitScreen({super.key});
+  final ChallengeModel? challengeToEdit;
+
+  const HabitScreen({super.key, this.challengeToEdit});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,6 +54,22 @@ class HabitScreen extends HookConsumerWidget {
     final threatLevel = useState('MEDIUM');
     final chConsequenceType = useState('PHYSICAL');
     final specificConsequence = useState('COLD SHOWER');
+    final roadmap = useState<List<ChallengeMilestone>>([]);
+
+    final creationMode = useState('HABIT'); // 'HABIT' or 'CHALLENGE'
+
+    useEffect(() {
+      if (challengeToEdit != null) {
+        creationMode.value = 'CHALLENGE';
+        chNameController.text = challengeToEdit!.name;
+        chDurationController.text = challengeToEdit!.duration.toString();
+        threatLevel.value = challengeToEdit!.threatLevel;
+        chConsequenceType.value = challengeToEdit!.consequenceType;
+        specificConsequence.value = challengeToEdit!.specificConsequence;
+        roadmap.value = challengeToEdit!.roadmap;
+      }
+      return null;
+    }, []);
 
     void handleCreateHabit() {
       if (nameController.text.isEmpty) {
@@ -91,11 +111,13 @@ class HabitScreen extends HookConsumerWidget {
           endDate.isAfter(today);
     }).length;
 
-    final creationMode = useState('HABIT'); // 'HABIT' or 'CHALLENGE'
     final isChallengeLimitReached = activeChallengesCount >= 5;
 
     // Reset mode to HABIT if challenge was selected but limit reached (e.g. after adding one)
-    if (isChallengeLimitReached && creationMode.value == 'CHALLENGE') {
+    // ONLY if we are NOT editing
+    if (challengeToEdit == null &&
+        isChallengeLimitReached &&
+        creationMode.value == 'CHALLENGE') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         creationMode.value = 'HABIT';
       });
@@ -110,9 +132,9 @@ class HabitScreen extends HookConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Create New',
-          style: TextStyle(
+        title: Text(
+          challengeToEdit != null ? 'Edit Mission' : 'Create New',
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -127,33 +149,35 @@ class HabitScreen extends HookConsumerWidget {
           children: [
             const SizedBox(height: 10),
             // MODE TOGGLE
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.habitSurface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _modeToggleItem(
-                      'HABIT',
-                      creationMode.value == 'HABIT',
-                      () => creationMode.value = 'HABIT',
-                    ),
-                  ),
-                  if (!isChallengeLimitReached)
+            if (challengeToEdit == null) ...[
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.habitSurface,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
                     Expanded(
                       child: _modeToggleItem(
-                        'CHALLENGE',
-                        creationMode.value == 'CHALLENGE',
-                        () => creationMode.value = 'CHALLENGE',
+                        'HABIT',
+                        creationMode.value == 'HABIT',
+                        () => creationMode.value = 'HABIT',
                       ),
                     ),
-                ],
+                    if (!isChallengeLimitReached)
+                      Expanded(
+                        child: _modeToggleItem(
+                          'CHALLENGE',
+                          creationMode.value == 'CHALLENGE',
+                          () => creationMode.value = 'CHALLENGE',
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(height: context.h(3)),
+              SizedBox(height: context.h(3)),
+            ],
 
             if (creationMode.value == 'HABIT') ...[
               // HABIT IDENTITY
@@ -276,6 +300,7 @@ class HabitScreen extends HookConsumerWidget {
                 threatLevel,
                 chConsequenceType,
                 specificConsequence,
+                roadmap,
                 () => handleAcceptChallenge(
                   context,
                   ref,
@@ -284,6 +309,7 @@ class HabitScreen extends HookConsumerWidget {
                   threatLevel,
                   chConsequenceType,
                   specificConsequence,
+                  roadmap.value,
                 ),
               ),
             ],
@@ -783,6 +809,7 @@ class HabitScreen extends HookConsumerWidget {
     ValueNotifier<String> threatLevel,
     ValueNotifier<String> consequenceType,
     ValueNotifier<String> specificConsequence,
+    List<ChallengeMilestone> roadmap,
   ) {
     if (nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -795,16 +822,29 @@ class HabitScreen extends HookConsumerWidget {
 
     final duration = int.tryParse(durationController.text) ?? 30;
 
-    ref
-        .read(challengeProvider.notifier)
-        .addChallenge(
-          name: nameController.text.toUpperCase(),
-          duration: duration,
-          threatLevel: threatLevel.value,
-          consequenceType: consequenceType.value,
-          specificConsequence: specificConsequence.value,
-          startDate: DateTime.now(),
-        );
+    if (challengeToEdit != null) {
+      final updatedChallenge = challengeToEdit!.copyWith(
+        name: nameController.text.toUpperCase(),
+        duration: duration,
+        threatLevel: threatLevel.value,
+        consequenceType: consequenceType.value,
+        specificConsequence: specificConsequence.value,
+        roadmap: roadmap,
+      );
+      ref.read(challengeProvider.notifier).updateChallenge(updatedChallenge);
+    } else {
+      ref
+          .read(challengeProvider.notifier)
+          .addChallenge(
+            name: nameController.text.toUpperCase(),
+            duration: duration,
+            threatLevel: threatLevel.value,
+            consequenceType: consequenceType.value,
+            specificConsequence: specificConsequence.value,
+            startDate: DateTime.now(),
+            roadmap: roadmap,
+          );
+    }
 
     Navigator.pop(context);
   }
@@ -817,6 +857,7 @@ class HabitScreen extends HookConsumerWidget {
     ValueNotifier<String> threatLevel,
     ValueNotifier<String> consequenceType,
     ValueNotifier<String> specificConsequence,
+    ValueNotifier<List<ChallengeMilestone>> roadmap,
     VoidCallback onAccept,
   ) {
     return [
@@ -910,6 +951,21 @@ class HabitScreen extends HookConsumerWidget {
           ),
         ],
       ),
+
+      const SizedBox(height: 30),
+      _buildChSectionHeader('MISSION ROADMAP'),
+      ...roadmap.value.map(
+        (m) => _buildMilestoneTile(m, () {
+          roadmap.value = roadmap.value
+              .where((item) => item.id != m.id)
+              .toList();
+        }),
+      ),
+      _buildAddMilestoneButton(() {
+        _showAddMilestoneDialog(context, (m) {
+          roadmap.value = [...roadmap.value, m];
+        });
+      }),
 
       const SizedBox(height: 40),
       _buildChWarningCard(),
@@ -1156,6 +1212,281 @@ class HabitScreen extends HookConsumerWidget {
             letterSpacing: 1.2,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMilestoneTile(
+    ChallengeMilestone milestone,
+    VoidCallback onRemove,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.habitSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.habitBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.habitPrimary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.flag,
+              color: AppColors.habitPrimary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  milestone.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '${milestone.durationDays} Days • ${milestone.subtasks.length} Subtasks',
+                  style: const TextStyle(color: Colors.grey, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.remove_circle_outline,
+              color: Colors.redAccent,
+              size: 20,
+            ),
+            onPressed: onRemove,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddMilestoneButton(VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: AppColors.habitPrimary,
+            style: BorderStyle.solid,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, color: AppColors.habitPrimary, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'ADD MILESTONE',
+              style: TextStyle(
+                color: AppColors.habitPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddMilestoneDialog(
+    BuildContext context,
+    Function(ChallengeMilestone) onAdded,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => _MilestoneAddDialog(onAdded: onAdded),
+    );
+  }
+}
+
+class _MilestoneAddDialog extends HookWidget {
+  final Function(ChallengeMilestone) onAdded;
+  const _MilestoneAddDialog({required this.onAdded});
+
+  @override
+  Widget build(BuildContext context) {
+    final titleController = useTextEditingController();
+    final descController = useTextEditingController();
+    final durationController = useTextEditingController(text: '7');
+    final subtaskController = useTextEditingController();
+    final subtasks = useState<List<String>>([]);
+
+    return Dialog(
+      backgroundColor: AppColors.habitSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add Milestone',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _dialogTextField(titleController, 'Milestone Title (e.g. Phase 1)'),
+            const SizedBox(height: 15),
+            _dialogTextField(descController, 'Description', maxLines: 3),
+            const SizedBox(height: 15),
+            _dialogTextField(
+              durationController,
+              'Duration (Days)',
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 25),
+            const Text(
+              'SUBTASKS',
+              style: TextStyle(
+                color: AppColors.habitPrimary,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _dialogTextField(subtaskController, 'Add subtask...'),
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_circle,
+                    color: AppColors.habitPrimary,
+                  ),
+                  onPressed: () {
+                    if (subtaskController.text.isNotEmpty) {
+                      subtasks.value = [
+                        ...subtasks.value,
+                        subtaskController.text,
+                      ];
+                      subtaskController.clear();
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...subtasks.value.map(
+              (s) => Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.subdirectory_arrow_right,
+                      color: Colors.grey,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      s,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'CANCEL',
+                    style: TextStyle(color: Colors.white30),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    if (titleController.text.isNotEmpty) {
+                      onAdded(
+                        ChallengeMilestone(
+                          id: const Uuid().v4(),
+                          title: titleController.text,
+                          description: descController.text,
+                          durationDays:
+                              int.tryParse(durationController.text) ?? 7,
+                          subtasks: subtasks.value
+                              .map(
+                                (s) => ChallengeSubtask(
+                                  id: const Uuid().v4(),
+                                  title: s,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      );
+                      Navigator.pop(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.habitPrimary,
+                  ),
+                  child: const Text(
+                    'ADD',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogTextField(
+    TextEditingController controller,
+    String hint, {
+    int maxLines = 1,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+        filled: true,
+        fillColor: AppColors.habitBg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.all(16),
       ),
     );
   }
