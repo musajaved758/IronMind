@@ -13,6 +13,7 @@ class HabitCard extends StatelessWidget {
   final DateTime selectedDate;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onTap;
 
   const HabitCard({
     super.key,
@@ -26,6 +27,7 @@ class HabitCard extends StatelessWidget {
     required this.selectedDate,
     this.onEdit,
     this.onDelete,
+    this.onTap,
   });
 
   @override
@@ -58,11 +60,7 @@ class HabitCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
         ),
         child: ListTile(
-          onTap: () {
-            if (motivationNote.isNotEmpty) {
-              _showMotivationDialog(context, colors);
-            }
-          },
+          onTap: onTap,
           leading: Transform.scale(
             scale: 1.2,
             child: Checkbox(
@@ -173,61 +171,6 @@ class HabitCard extends StatelessWidget {
                   ],
                 ),
               ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showMotivationDialog(BuildContext context, AppColorScheme colors) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: colors.dialogBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.rocket_launch, color: colors.primary, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                "My Motivation",
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                motivationNote,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: colors.textSecondary,
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  "CLOSE",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
             ],
           ),
         ),

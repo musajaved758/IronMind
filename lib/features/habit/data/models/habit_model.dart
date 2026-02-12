@@ -65,6 +65,92 @@ class HabitModel {
     );
   }
 
+  int get duration {
+    final start = DateTime(createdAt.year, createdAt.month, createdAt.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    return end.difference(start).inDays + 1;
+  }
+
+  int get daysElapsed {
+    final now = DateTime.now();
+    final difference = now.difference(createdAt).inDays;
+    return difference >= 0 ? difference : 0;
+  }
+
+  int get daysRemaining {
+    final now = DateTime.now();
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final remaining = end.difference(today).inDays;
+    return remaining >= 0 ? remaining : 0;
+  }
+
+  double get progress {
+    if (duration == 0) return 0.0;
+    return completedDates.length / duration;
+  }
+
+  int get currentStreak {
+    if (completedDates.isEmpty) return 0;
+
+    final uniqueDates =
+        completedDates
+            .map((d) => DateTime(d.year, d.month, d.day))
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.compareTo(b));
+
+    if (uniqueDates.isEmpty) return 0;
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final yesterdayDate = todayDate.subtract(const Duration(days: 1));
+
+    final lastCompleted = uniqueDates.last;
+
+    if (!lastCompleted.isAtSameMomentAs(todayDate) &&
+        !lastCompleted.isAtSameMomentAs(yesterdayDate)) {
+      return 0;
+    }
+
+    int streak = 1;
+    for (int i = uniqueDates.length - 1; i > 0; i--) {
+      final current = uniqueDates[i];
+      final prev = uniqueDates[i - 1];
+      if (current.difference(prev).inDays == 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  int get longestStreak {
+    if (completedDates.isEmpty) return 0;
+
+    final uniqueDates =
+        completedDates
+            .map((d) => DateTime(d.year, d.month, d.day))
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.compareTo(b));
+
+    if (uniqueDates.isEmpty) return 0;
+
+    int longest = 1;
+    int current = 1;
+    for (int i = 1; i < uniqueDates.length; i++) {
+      if (uniqueDates[i].difference(uniqueDates[i - 1]).inDays == 1) {
+        current++;
+        if (current > longest) longest = current;
+      } else {
+        current = 1;
+      }
+    }
+    return longest;
+  }
+
   HabitModel copyWith({
     String? id,
     String? name,

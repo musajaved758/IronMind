@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:iron_mind/core/utils/colors.dart';
 import 'package:iron_mind/features/intel/presentation/providers/stats_provider.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 class IntelScreen extends HookConsumerWidget {
   const IntelScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedView = useState('CHALLENGES');
+    final pageController = usePageController();
+    final currentPage = useState(0);
     final colors = Theme.of(context).appColors;
 
     return Scaffold(
@@ -30,21 +31,27 @@ class IntelScreen extends HookConsumerWidget {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          _buildToggle(selectedView, colors),
-          Expanded(
-            child: selectedView.value == 'CHALLENGES'
-                ? const _ChallengesView()
-                : const _HabitsView(),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildToggle(currentPage, pageController, colors),
+            Expanded(
+              child: PageView(
+                controller: pageController,
+                onPageChanged: (index) => currentPage.value = index,
+                children: const [_ChallengesView(), _HabitsView()],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildToggle(
-    ValueNotifier<String> selectedView,
+    ValueNotifier<int> currentPage,
+    PageController pageController,
     AppColorScheme colors,
   ) {
     return Padding(
@@ -60,16 +67,24 @@ class IntelScreen extends HookConsumerWidget {
             Expanded(
               child: _toggleItem(
                 'CHALLENGES',
-                selectedView.value == 'CHALLENGES',
-                () => selectedView.value = 'CHALLENGES',
+                currentPage.value == 0,
+                () => pageController.animateToPage(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                ),
                 colors,
               ),
             ),
             Expanded(
               child: _toggleItem(
                 'HABITS',
-                selectedView.value == 'HABITS',
-                () => selectedView.value = 'HABITS',
+                currentPage.value == 1,
+                () => pageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                ),
                 colors,
               ),
             ),
@@ -109,6 +124,10 @@ class IntelScreen extends HookConsumerWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CHALLENGES TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _ChallengesView extends HookConsumerWidget {
   const _ChallengesView();
 
@@ -125,10 +144,26 @@ class _ChallengesView extends HookConsumerWidget {
           _sectionHeader('OVERALL CHALLENGE PROGRESS', colors),
           const SizedBox(height: 20),
           _buildRadialProgress(stats, colors),
+          const SizedBox(height: 20),
+          _buildStreakCards(
+            stats.bestCurrentStreak,
+            stats.bestLongestStreak,
+            colors,
+          ),
           const SizedBox(height: 40),
           _sectionHeader('STREAK & CONSISTENCY', colors),
           const SizedBox(height: 20),
-          _buildConsistencyInsight(stats, colors),
+          _ConsistencyCalendar(
+            monthlyProgress: stats.monthlyProgress,
+            computeDayCount: (date) {
+              int count = 0;
+              for (final c in stats.allChallenges) {
+                if (c.isCompletedOn(date)) count++;
+              }
+              return count;
+            },
+            colors: colors,
+          ),
           const SizedBox(height: 40),
           _sectionHeader('PROGRESS OVER TIME', colors),
           const SizedBox(height: 20),
@@ -155,30 +190,11 @@ class _ChallengesView extends HookConsumerWidget {
           SizedBox(
             height: 120,
             width: 120,
-            child: Stack(
-              children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 0,
-                    centerSpaceRadius: 45,
-                    sections: [
-                      PieChartSectionData(
-                        value: stats.overallCompletionRate * 100,
-                        color: colors.primary,
-                        radius: 12,
-                        showTitle: false,
-                      ),
-                      PieChartSectionData(
-                        value: (1 - stats.overallCompletionRate) * 100,
-                        color: colors.progressBarBg,
-                        radius: 10,
-                        showTitle: false,
-                      ),
-                    ],
-                  ),
-                ),
-                Center(
-                  child: Column(
+            child: SfCircularChart(
+              margin: EdgeInsets.zero,
+              annotations: <CircularChartAnnotation>[
+                CircularChartAnnotation(
+                  widget: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
@@ -195,6 +211,27 @@ class _ChallengesView extends HookConsumerWidget {
                       ),
                     ],
                   ),
+                ),
+              ],
+              series: <CircularSeries>[
+                DoughnutSeries<_PieData, String>(
+                  dataSource: [
+                    _PieData(
+                      'Completed',
+                      stats.overallCompletionRate * 100,
+                      colors.primary,
+                    ),
+                    _PieData(
+                      'Remaining',
+                      (1 - stats.overallCompletionRate) * 100,
+                      colors.progressBarBg,
+                    ),
+                  ],
+                  xValueMapper: (_PieData d, _) => d.label,
+                  yValueMapper: (_PieData d, _) => d.value,
+                  pointColorMapper: (_PieData d, _) => d.color,
+                  innerRadius: '75%',
+                  radius: '100%',
                 ),
               ],
             ),
@@ -266,163 +303,63 @@ class _ChallengesView extends HookConsumerWidget {
     AppColorScheme colors,
   ) {
     final sortedDates = history.keys.toList()..sort();
-    final dataPoints = sortedDates.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), history[e.value]!.toDouble());
-    }).toList();
+    final dataPoints = sortedDates
+        .map((date) => _TimeData(date, history[date]!.toDouble()))
+        .toList();
 
     return Container(
-      height: 200,
+      height: 220,
       padding: const EdgeInsets.fromLTRB(10, 20, 20, 10),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.border.withOpacity(0.5)),
       ),
-      child: LineChart(
-        LineChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: const FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: dataPoints,
-              isCurved: true,
-              color: colors.primary,
-              barWidth: 4,
-              isStrokeCapRound: true,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: colors.primary.withOpacity(0.1),
-              ),
-            ),
-          ],
+      child: SfCartesianChart(
+        plotAreaBorderWidth: 0,
+        primaryXAxis: DateTimeAxis(
+          majorGridLines: const MajorGridLines(width: 0),
+          axisLine: AxisLine(color: colors.border),
+          labelStyle: TextStyle(color: colors.textMuted, fontSize: 9),
+          dateFormat: DateFormat.Md(),
+          intervalType: DateTimeIntervalType.days,
+          interval: 7,
         ),
-      ),
-    );
-  }
-
-  Widget _buildConsistencyInsight(
-    ChallengeIntelStats stats,
-    AppColorScheme colors,
-  ) {
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
-    final daysInMonth = lastDayOfMonth.day;
-    final startingWeekday = firstDayOfMonth.weekday;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                DateFormat('MMMM yyyy').format(now).toUpperCase(),
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
+        primaryYAxis: NumericAxis(
+          majorGridLines: MajorGridLines(
+            color: colors.border.withOpacity(0.3),
+            dashArray: const [4, 4],
           ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-                .map(
-                  (d) => Expanded(
-                    child: Center(
-                      child: Text(
-                        d,
-                        style: TextStyle(
-                          color: colors.textMuted,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
+          axisLine: const AxisLine(width: 0),
+          labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
+        ),
+        tooltipBehavior: TooltipBehavior(enable: true),
+        series: <CartesianSeries>[
+          SplineAreaSeries<_TimeData, DateTime>(
+            dataSource: dataPoints,
+            xValueMapper: (_TimeData d, _) => d.date,
+            yValueMapper: (_TimeData d, _) => d.value,
+            color: colors.primary,
+            borderColor: colors.primary,
+            borderWidth: 3,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                colors.primary.withOpacity(0.3),
+                colors.primary.withOpacity(0.0),
+              ],
             ),
-            itemCount: daysInMonth + (startingWeekday - 1),
-            itemBuilder: (context, index) {
-              if (index < startingWeekday - 1) {
-                return const SizedBox();
-              }
-              final day = index - (startingWeekday - 1) + 1;
-              final date = DateTime(now.year, now.month, day);
-              final count = stats.monthlyProgress[date] ?? 0;
-              final isToday =
-                  date.year == now.year &&
-                  date.month == now.month &&
-                  date.day == now.day;
-              final isFuture = date.isAfter(now);
-
-              Color bgColor = colors.progressBarBg;
-              Color textColor = colors.textMuted;
-
-              if (!isFuture) {
-                if (count > 0) {
-                  bgColor = colors.primary;
-                  textColor = Colors.white;
-                } else if (date.isBefore(
-                  DateTime(now.year, now.month, now.day),
-                )) {
-                  bgColor = AppColors.highPriorityColor.withOpacity(0.2);
-                  textColor = AppColors.highPriorityColor;
-                }
-              }
-
-              if (isToday) {
-                if (count == 0) {
-                  bgColor = colors.primary.withOpacity(0.2);
-                  textColor = colors.primary;
-                }
-              }
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(8),
-                  border: isToday
-                      ? Border.all(color: colors.primary, width: 1)
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$day',
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              );
-            },
           ),
         ],
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HABITS TAB
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _HabitsView extends HookConsumerWidget {
   const _HabitsView();
@@ -432,12 +369,27 @@ class _HabitsView extends HookConsumerWidget {
     final stats = ref.watch(habitStatsProvider);
     final colors = Theme.of(context).appColors;
 
+    // Build monthly progress for habits (same structure as challenges)
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
+    final Map<DateTime, int> habitMonthlyProgress = {};
+    for (int i = 0; i < daysInMonth; i++) {
+      final date = startOfMonth.add(Duration(days: i));
+      int count = 0;
+      for (final h in stats.allHabits) {
+        if (h.isCompletedOn(date)) count++;
+      }
+      habitMonthlyProgress[date] = count;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionHeader('HABIT COMPLETION OVERVIEW', colors),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -467,6 +419,26 @@ class _HabitsView extends HookConsumerWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 20),
+          _buildStreakCards(
+            stats.bestCurrentStreak,
+            stats.bestLongestStreak,
+            colors,
+          ),
+          const SizedBox(height: 40),
+          _sectionHeader('STREAK & CONSISTENCY', colors),
+          const SizedBox(height: 20),
+          _ConsistencyCalendar(
+            monthlyProgress: habitMonthlyProgress,
+            computeDayCount: (date) {
+              int count = 0;
+              for (final h in stats.allHabits) {
+                if (h.isCompletedOn(date)) count++;
+              }
+              return count;
+            },
+            colors: colors,
           ),
           const SizedBox(height: 40),
           _sectionHeader('DAILY HABIT TREND', colors),
@@ -524,19 +496,14 @@ class _HabitsView extends HookConsumerWidget {
     AppColorScheme colors,
   ) {
     final sortedDates = weeklyTrend.keys.toList()..sort();
-    final barGroups = sortedDates.asMap().entries.map((e) {
-      return BarChartGroupData(
-        x: e.key,
-        barRods: [
-          BarChartRodData(
-            toY: weeklyTrend[e.value]!.toDouble(),
-            color: colors.primary,
-            width: 16,
-            borderRadius: BorderRadius.circular(4),
+    final dataPoints = sortedDates
+        .map(
+          (date) => _BarData(
+            DateFormat('E').format(date)[0],
+            weeklyTrend[date]!.toDouble(),
           ),
-        ],
-      );
-    }).toList();
+        )
+        .toList();
 
     return Container(
       height: 200,
@@ -545,36 +512,34 @@ class _HabitsView extends HookConsumerWidget {
         color: colors.surface,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: BarChart(
-        BarChartData(
-          gridData: const FlGridData(show: false),
-          titlesData: FlTitlesData(
-            show: true,
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final date = sortedDates[value.toInt()];
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      DateFormat('E').format(date)[0],
-                      style: TextStyle(color: colors.textMuted, fontSize: 10),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: barGroups,
+      child: SfCartesianChart(
+        plotAreaBorderWidth: 0,
+        primaryXAxis: CategoryAxis(
+          majorGridLines: const MajorGridLines(width: 0),
+          axisLine: AxisLine(color: colors.border),
+          labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
         ),
+        primaryYAxis: NumericAxis(
+          majorGridLines: MajorGridLines(
+            color: colors.border.withOpacity(0.3),
+            dashArray: const [4, 4],
+          ),
+          axisLine: const AxisLine(width: 0),
+          labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
+        ),
+        series: <CartesianSeries>[
+          ColumnSeries<_BarData, String>(
+            dataSource: dataPoints,
+            xValueMapper: (_BarData d, _) => d.label,
+            yValueMapper: (_BarData d, _) => d.value,
+            color: colors.primary,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(6),
+              topRight: Radius.circular(6),
+            ),
+            width: 0.5,
+          ),
+        ],
       ),
     );
   }
@@ -609,24 +574,49 @@ class _HabitsView extends HookConsumerWidget {
               ],
             ),
           ),
-          Column(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '${detail.currentStreak}',
-                style: const TextStyle(
-                  color: Colors.orangeAccent,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
+              Column(
+                children: [
+                  Text(
+                    '${detail.currentStreak}',
+                    style: const TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Text(
+                    'CURRENT',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: 7,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              const Text(
-                'STREAK',
-                style: TextStyle(
-                  color: Colors.orangeAccent,
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
-                ),
+              const SizedBox(width: 12),
+              Column(
+                children: [
+                  Text(
+                    '${detail.bestStreak}',
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'BEST',
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontSize: 7,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -634,6 +624,98 @@ class _HabitsView extends HookConsumerWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED WIDGETS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Streak cards showing current and longest streak (shared by both tabs)
+Widget _buildStreakCards(
+  int currentStreak,
+  int longestStreak,
+  AppColorScheme colors,
+) {
+  return Row(
+    children: [
+      Expanded(
+        child: _streakCard(
+          'CURRENT STREAK',
+          '$currentStreak',
+          'Days',
+          Colors.orangeAccent,
+          colors,
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: _streakCard(
+          'LONGEST STREAK',
+          '$longestStreak',
+          'Days',
+          colors.primary,
+          colors,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _streakCard(
+  String label,
+  String value,
+  String unit,
+  Color accentColor,
+  AppColorScheme colors,
+) {
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+    decoration: BoxDecoration(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: accentColor.withOpacity(0.3)),
+    ),
+    child: Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                color: accentColor,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                unit,
+                style: TextStyle(
+                  color: accentColor.withOpacity(0.7),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.textMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 Widget _sectionHeader(String title, AppColorScheme colors) {
@@ -646,4 +728,465 @@ Widget _sectionHeader(String title, AppColorScheme colors) {
       letterSpacing: 1.5,
     ),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSISTENCY CALENDAR (Month / 90 Days / Year dropdown)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ConsistencyCalendar extends HookWidget {
+  final Map<DateTime, int> monthlyProgress;
+  final int Function(DateTime date) computeDayCount;
+  final AppColorScheme colors;
+
+  const _ConsistencyCalendar({
+    required this.monthlyProgress,
+    required this.computeDayCount,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final viewMode = useState('Month');
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _getTitle(viewMode.value),
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.chipBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: colors.border.withOpacity(0.5)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: viewMode.value,
+                    isDense: true,
+                    dropdownColor: colors.dialogBg,
+                    borderRadius: BorderRadius.circular(12),
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    icon: Icon(
+                      Icons.expand_more,
+                      color: colors.textSecondary,
+                      size: 18,
+                    ),
+                    items: ['Month', '90 Days', 'Year'].map((m) {
+                      return DropdownMenuItem(value: m, child: Text(m));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) viewMode.value = val;
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (viewMode.value == 'Month')
+            _buildMonthView()
+          else
+            _HeatmapGrid(
+              key: ValueKey(viewMode.value),
+              mode: viewMode.value,
+              computeDayCount: computeDayCount,
+              colors: colors,
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _getTitle(String mode) {
+    final now = DateTime.now();
+    switch (mode) {
+      case 'Month':
+        return DateFormat('MMMM yyyy').format(now).toUpperCase();
+      case '90 Days':
+        return 'LAST 90 DAYS';
+      case 'Year':
+        return '${now.year} OVERVIEW';
+      default:
+        return '';
+    }
+  }
+
+  Widget _buildMonthView() {
+    final now = DateTime.now();
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
+    final startingWeekday = firstDayOfMonth.weekday;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+              .map(
+                (d) => Expanded(
+                  child: Center(
+                    child: Text(
+                      d,
+                      style: TextStyle(
+                        color: colors.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 10),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+          ),
+          itemCount: daysInMonth + (startingWeekday - 1),
+          itemBuilder: (context, index) {
+            if (index < startingWeekday - 1) {
+              return const SizedBox();
+            }
+            final day = index - (startingWeekday - 1) + 1;
+            final date = DateTime(now.year, now.month, day);
+            final count = monthlyProgress[date] ?? 0;
+            final isToday =
+                date.year == now.year &&
+                date.month == now.month &&
+                date.day == now.day;
+            final isFuture = date.isAfter(now);
+
+            Color bgColor = colors.progressBarBg;
+            Color textColor = colors.textMuted;
+
+            if (!isFuture) {
+              if (count > 0) {
+                bgColor = colors.primary;
+                textColor = Colors.white;
+              } else if (date.isBefore(
+                DateTime(now.year, now.month, now.day),
+              )) {
+                bgColor = AppColors.highPriorityColor.withOpacity(0.2);
+                textColor = AppColors.highPriorityColor;
+              }
+            }
+
+            if (isToday && count == 0) {
+              bgColor = colors.primary.withOpacity(0.2);
+              textColor = colors.primary;
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(8),
+                border: isToday
+                    ? Border.all(color: colors.primary, width: 1)
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$day',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GITHUB-STYLE HEATMAP GRID (auto-scrolls to current week)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HeatmapGrid extends StatefulWidget {
+  final String mode;
+  final int Function(DateTime date) computeDayCount;
+  final AppColorScheme colors;
+
+  const _HeatmapGrid({
+    super.key,
+    required this.mode,
+    required this.computeDayCount,
+    required this.colors,
+  });
+
+  @override
+  State<_HeatmapGrid> createState() => _HeatmapGridState();
+}
+
+class _HeatmapGridState extends State<_HeatmapGrid> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    final mode = widget.mode;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final int totalDays = mode == '90 Days' ? 90 : 365;
+    final rawStart = today.subtract(Duration(days: totalDays - 1));
+
+    // Align start to Monday of that week
+    final adjustedStart = rawStart.subtract(
+      Duration(days: rawStart.weekday - 1),
+    );
+
+    // Compute completion data
+    final Map<DateTime, int> progress = {};
+    for (int i = 0; i < totalDays; i++) {
+      final date = rawStart.add(Duration(days: i));
+      progress[date] = widget.computeDayCount(date);
+    }
+
+    final double cellSize = mode == '90 Days' ? 22 : 12;
+    final double spacing = mode == '90 Days' ? 3 : 2;
+    final totalAdjustedDays = today.difference(adjustedStart).inDays + 1;
+    final int weeksCount = (totalAdjustedDays / 7).ceil();
+
+    // Build month labels at week positions
+    final List<_MonthLabel> monthLabels = [];
+    String? lastMonth;
+    for (int w = 0; w < weeksCount; w++) {
+      final weekMonday = adjustedStart.add(Duration(days: w * 7));
+      final monthKey = '${weekMonday.year}-${weekMonday.month}';
+      if (monthKey != lastMonth) {
+        monthLabels.add(_MonthLabel(DateFormat('MMM').format(weekMonday), w));
+        lastMonth = monthKey;
+      }
+    }
+
+    final dayLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+    const double dayLabelWidth = 30;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Y-axis: day-of-week labels
+            SizedBox(
+              width: dayLabelWidth,
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  ...List.generate(7, (i) {
+                    return SizedBox(
+                      height: cellSize + spacing,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          dayLabels[i],
+                          style: TextStyle(
+                            color: colors.textMuted,
+                            fontSize: mode == '90 Days' ? 10 : 8,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            // Scrollable heatmap grid
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // X-axis: month labels
+                    SizedBox(
+                      height: 16,
+                      width: weeksCount * (cellSize + spacing),
+                      child: Stack(
+                        children: monthLabels.map((ml) {
+                          return Positioned(
+                            left: ml.weekIndex * (cellSize + spacing),
+                            child: Text(
+                              ml.label,
+                              style: TextStyle(
+                                color: colors.textMuted,
+                                fontSize: mode == '90 Days' ? 10 : 8,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    // Grid cells
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List.generate(weeksCount, (weekIndex) {
+                        return SizedBox(
+                          width: cellSize + spacing,
+                          child: Column(
+                            children: List.generate(7, (dayIndex) {
+                              final date = adjustedStart.add(
+                                Duration(days: weekIndex * 7 + dayIndex),
+                              );
+                              final isInRange =
+                                  !date.isBefore(rawStart) &&
+                                  !date.isAfter(today);
+
+                              if (!isInRange) {
+                                return SizedBox(
+                                  height: cellSize + spacing,
+                                  width: cellSize,
+                                );
+                              }
+
+                              final count = progress[date] ?? 0;
+
+                              Color bgColor;
+                              if (count == 0) {
+                                bgColor = colors.progressBarBg;
+                              } else if (count == 1) {
+                                bgColor = colors.primary.withOpacity(0.35);
+                              } else if (count == 2) {
+                                bgColor = colors.primary.withOpacity(0.6);
+                              } else {
+                                bgColor = colors.primary;
+                              }
+
+                              return Padding(
+                                padding: EdgeInsets.all(spacing / 2),
+                                child: Container(
+                                  width: cellSize,
+                                  height: cellSize,
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(
+                                      mode == '90 Days' ? 4 : 2,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Legend
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Less ',
+              style: TextStyle(color: colors.textMuted, fontSize: 10),
+            ),
+            ...List.generate(4, (i) {
+              final opacity = [0.15, 0.35, 0.6, 1.0][i];
+              return Container(
+                width: 12,
+                height: 12,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: colors.primary.withOpacity(opacity),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              );
+            }),
+            Text(
+              ' More',
+              style: TextStyle(color: colors.textMuted, fontSize: 10),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA CLASSES
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PieData {
+  final String label;
+  final double value;
+  final Color color;
+  _PieData(this.label, this.value, this.color);
+}
+
+class _TimeData {
+  final DateTime date;
+  final double value;
+  _TimeData(this.date, this.value);
+}
+
+class _BarData {
+  final String label;
+  final double value;
+  _BarData(this.label, this.value);
+}
+
+class _MonthLabel {
+  final String label;
+  final int weekIndex;
+  _MonthLabel(this.label, this.weekIndex);
 }

@@ -17,7 +17,26 @@ class CustomNavBar extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSwapped = ref.watch(swapHomeAndChallengeProvider);
+    final hasPhases = ref.watch(hasAnyPhasesProvider);
     final colors = Theme.of(context).appColors;
+
+    // Build nav items dynamically — skip PHASES if no challenge has roadmap
+    final items = <_NavItemData>[];
+
+    if (isSwapped) {
+      items.add(_NavItemData(Icons.military_tech_rounded, 'CHALLENGES'));
+      items.add(_NavItemData(Icons.grid_view_rounded, 'HABIT'));
+    } else {
+      items.add(_NavItemData(Icons.grid_view_rounded, 'HABIT'));
+      items.add(_NavItemData(Icons.military_tech_rounded, 'CHALLENGES'));
+    }
+
+    if (hasPhases) {
+      items.add(_NavItemData(Icons.calendar_today_rounded, 'PHASES'));
+    }
+
+    items.add(_NavItemData(Icons.show_chart_rounded, 'PROGRESS'));
+    items.add(_NavItemData(Icons.settings_rounded, 'SETTINGS'));
 
     return Container(
       height: context.hp(10),
@@ -29,16 +48,8 @@ class CustomNavBar extends HookConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            if (isSwapped) ...[
-              _navItem(0, Icons.military_tech_rounded, 'CHALLENGES', colors),
-              _navItem(1, Icons.grid_view_rounded, 'HABIT', colors),
-            ] else ...[
-              _navItem(0, Icons.grid_view_rounded, 'HABIT', colors),
-              _navItem(1, Icons.military_tech_rounded, 'CHALLENGES', colors),
-            ],
-            _navItem(2, Icons.calendar_today_rounded, 'PHASES', colors),
-            _navItem(3, Icons.show_chart_rounded, 'PROGRESS', colors),
-            _navItem(4, Icons.settings_rounded, 'SETTINGS', colors),
+            for (int i = 0; i < items.length; i++)
+              _navItem(i, items[i].icon, items[i].label, colors),
           ],
         ),
       ),
@@ -73,4 +84,10 @@ class CustomNavBar extends HookConsumerWidget {
       ),
     );
   }
+}
+
+class _NavItemData {
+  final IconData icon;
+  final String label;
+  _NavItemData(this.icon, this.label);
 }

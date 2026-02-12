@@ -3,7 +3,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:iron_mind/core/utils/colors.dart';
 import 'package:iron_mind/features/habit/presentation/providers/habit_provider.dart';
 import 'package:iron_mind/features/home/presentation/widgets/habit_card.dart';
-import 'package:iron_mind/features/habit/habit_screen.dart';
+import 'package:iron_mind/features/habit/presentation/screens/create_habit_screen.dart';
+import 'package:iron_mind/features/habit/presentation/screens/habit_detail_screen.dart';
 
 class HabitListView extends HookConsumerWidget {
   final DateTime selectedDate;
@@ -95,11 +96,19 @@ class HabitListView extends HookConsumerWidget {
           priority: habit.priority,
           motivationNote: habit.motivationNote,
           selectedDate: selectedDate,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HabitDetailScreen(habit: habit),
+              ),
+            );
+          },
           onEdit: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => HabitScreen(habitToEdit: habit),
+                builder: (context) => CreateHabitScreen(habitToEdit: habit),
               ),
             );
           },

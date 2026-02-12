@@ -17,7 +17,10 @@ class PhaseScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final challenges = ref.watch(challengeProvider);
+    final allChallenges = ref.watch(challengeProvider);
+    final activeChallenges = allChallenges
+        .where((c) => !c.isCompleted)
+        .toList();
     final colors = Theme.of(context).appColors;
 
     return Scaffold(
@@ -37,23 +40,27 @@ class PhaseScreen extends HookConsumerWidget {
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      body: challenges.isEmpty
-          ? _buildEmptyState(colors)
-          : ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: challenges.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 40),
-              itemBuilder: (context, index) {
-                final color = operationColors[index % operationColors.length];
-                return _buildRoadmap(
-                  challenges[index],
-                  context,
-                  ref,
-                  color,
-                  colors,
-                );
-              },
-            ),
+      body: SafeArea(
+        top: false,
+        child: activeChallenges.isEmpty
+            ? _buildEmptyState(colors)
+            : ListView.separated(
+                padding: const EdgeInsets.all(20),
+                itemCount: activeChallenges.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 40),
+                itemBuilder: (context, index) {
+                  final color = operationColors[index % operationColors.length];
+                  return _buildRoadmap(
+                    activeChallenges[index],
+                    context,
+                    ref,
+                    color,
+                    colors,
+                  );
+                },
+              ),
+      ),
     );
   }
 
@@ -117,8 +124,7 @@ class PhaseScreen extends HookConsumerWidget {
 
             bool isLocked = false;
             if (index > 0) {
-              final previousMilestone = roadmap[index - 1];
-              if (!previousMilestone.isCompleted) {
+              if (!challenge.isMilestoneCompleted(index - 1)) {
                 isLocked = true;
               }
             }
@@ -126,6 +132,7 @@ class PhaseScreen extends HookConsumerWidget {
             return _buildRoadmapItem(
               challenge,
               milestone,
+              index, // Pass index for model helper
               index + 1,
               isLast,
               isLocked,
@@ -143,6 +150,7 @@ class PhaseScreen extends HookConsumerWidget {
   Widget _buildRoadmapItem(
     ChallengeModel challenge,
     ChallengeMilestone milestone,
+    int milestoneIndex,
     int stepNumber,
     bool isLast,
     bool isLocked,
@@ -151,6 +159,7 @@ class PhaseScreen extends HookConsumerWidget {
     Color accentColor,
     AppColorScheme colors,
   ) {
+    final isMilestoneDone = challenge.isMilestoneCompleted(milestoneIndex);
     Color primaryColor = isLocked ? colors.textMuted : accentColor;
     Color bgColor = isLocked ? colors.chipBg.withOpacity(0.5) : colors.surface;
     Color textColor = isLocked ? colors.textMuted : colors.textPrimary;
@@ -164,13 +173,13 @@ class PhaseScreen extends HookConsumerWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: milestone.isCompleted ? primaryColor : colors.bg,
+                color: isMilestoneDone ? primaryColor : colors.bg,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: primaryColor.withOpacity(isLocked ? 0.3 : 1.0),
                   width: 2,
                 ),
-                boxShadow: milestone.isCompleted && !isLocked
+                boxShadow: isMilestoneDone && !isLocked
                     ? [
                         BoxShadow(
                           color: primaryColor.withOpacity(0.3),
@@ -264,7 +273,7 @@ class PhaseScreen extends HookConsumerWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: milestone.isCompleted
+                              color: isMilestoneDone
                                   ? colors.chipBg
                                   : primaryColor,
                               borderRadius: BorderRadius.circular(4),
@@ -272,7 +281,7 @@ class PhaseScreen extends HookConsumerWidget {
                             child: Text(
                               isLocked
                                   ? 'LOCKED'
-                                  : (milestone.isCompleted
+                                  : (isMilestoneDone
                                         ? 'COMPLETED'
                                         : 'IN PROGRESS'),
                               style: const TextStyle(
@@ -280,6 +289,18 @@ class PhaseScreen extends HookConsumerWidget {
                                 fontSize: 8,
                                 fontWeight: FontWeight.bold,
                               ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: Text(
+                            'DAYS ${challenge.getMilestoneDayRange(milestoneIndex)[0]}-${challenge.getMilestoneDayRange(milestoneIndex)[1]}',
+                            style: TextStyle(
+                              color: textColor.withOpacity(0.5),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
@@ -323,45 +344,12 @@ class PhaseScreen extends HookConsumerWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '${milestone.durationDays} Days',
+                              '${milestone.durationDays} Days Duration',
                               style: TextStyle(
                                 color: colors.textMuted,
                                 fontSize: 12,
                               ),
                             ),
-                            const Spacer(),
-                            if (!isLocked)
-                              ElevatedButton(
-                                onPressed: () {
-                                  ref
-                                      .read(challengeProvider.notifier)
-                                      .toggleMilestoneCompletion(
-                                        challenge.id,
-                                        milestone.id,
-                                      );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: milestone.isCompleted
-                                      ? colors.chipBg
-                                      : primaryColor,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: Text(
-                                  milestone.isCompleted ? 'REDO' : 'COMPLETE',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                         if (milestone.subtasks.isNotEmpty) ...[
@@ -382,35 +370,14 @@ class PhaseScreen extends HookConsumerWidget {
                               padding: const EdgeInsets.only(bottom: 8.0),
                               child: Row(
                                 children: [
-                                  SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: Checkbox(
-                                      value: s.isCompleted,
-                                      onChanged: isLocked
-                                          ? null
-                                          : (value) {
-                                              ref
-                                                  .read(
-                                                    challengeProvider.notifier,
-                                                  )
-                                                  .toggleSubtaskCompletion(
-                                                    challenge.id,
-                                                    milestone.id,
-                                                    s.id,
-                                                  );
-                                            },
-                                      activeColor: primaryColor,
-                                      checkColor: Colors.white,
-                                      side: BorderSide(
-                                        color: isLocked
-                                            ? colors.textMuted.withOpacity(0.5)
-                                            : colors.textSecondary,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
+                                  Icon(
+                                    isMilestoneDone || s.isCompleted
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                    color: isMilestoneDone || s.isCompleted
+                                        ? primaryColor
+                                        : colors.textMuted,
+                                    size: 16,
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
@@ -419,11 +386,12 @@ class PhaseScreen extends HookConsumerWidget {
                                       style: TextStyle(
                                         color: isLocked
                                             ? colors.textMuted.withOpacity(0.5)
-                                            : (s.isCompleted
+                                            : (isMilestoneDone || s.isCompleted
                                                   ? colors.textMuted
                                                   : colors.textSecondary),
                                         fontSize: 12,
-                                        decoration: s.isCompleted
+                                        decoration:
+                                            isMilestoneDone || s.isCompleted
                                             ? TextDecoration.lineThrough
                                             : null,
                                       ),

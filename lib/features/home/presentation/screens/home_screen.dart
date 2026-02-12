@@ -6,6 +6,10 @@ import 'package:iron_mind/core/utils/colors.dart';
 import 'package:iron_mind/features/home/presentation/widgets/daily_summary_card.dart';
 import 'package:iron_mind/features/home/presentation/widgets/habit_list_view.dart';
 import 'package:iron_mind/core/providers/app_providers.dart';
+import 'package:iron_mind/features/habit/presentation/providers/habit_provider.dart';
+import 'package:iron_mind/features/habit/data/models/habit_model.dart';
+
+import 'package:iron_mind/features/habit/presentation/screens/create_habit_screen.dart';
 
 class HomeScreen extends HookConsumerWidget {
   const HomeScreen({super.key});
@@ -13,47 +17,50 @@ class HomeScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDate = ref.watch(selectedDateProvider);
+    final habits = ref.watch(habitProvider);
     final colors = Theme.of(context).appColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final showCalendar = ref.watch(showHabitCalendarProvider);
 
     // Start collapsed (showing only week view)
-    final scrollController = ScrollController(initialScrollOffset: 260);
+    final scrollController = ScrollController(
+      initialScrollOffset: showCalendar ? 260 : 0,
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: colors.bg,
-        body: SafeArea(
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification is ScrollUpdateNotification) {
-                final offset = notification.metrics.pixels;
-                final maxScroll = 260.0;
-                // When user scrolls up towards collapsed state and date is not today,
-                // snap selectedDate to today so the week strip shows current week
-                if (offset > maxScroll * 0.7) {
-                  final now = DateTime.now();
-                  final current = ref.read(selectedDateProvider);
-                  final isToday =
-                      now.day == current.day &&
-                      now.month == current.month &&
-                      now.year == current.year;
-                  if (!isToday) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      ref.read(selectedDateProvider.notifier).state = now;
-                    });
-                  }
-                }
-              }
-              return false;
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(
+            bottom: 80,
+          ), // Avoid overlap with NavBar
+          child: FloatingActionButton(
+            backgroundColor: colors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(200),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreateHabitScreen(),
+                ),
+              );
             },
-            child: CustomScrollView(
-              controller: scrollController,
-              slivers: [
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ),
+        body: SafeArea(
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: [
+              if (showCalendar)
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _CalendarHeaderDelegate(
                     selectedDate: selectedDate,
+                    habits: habits,
                     onDateSelected: (date) {
                       ref.read(selectedDateProvider.notifier).state = date;
                     },
@@ -63,26 +70,107 @@ class HomeScreen extends HookConsumerWidget {
                     },
                     colors: colors,
                   ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
+                )
+              else
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('EEEE, MMMM d').format(selectedDate),
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                ref
+                                    .read(selectedDateProvider.notifier)
+                                    .state = selectedDate.subtract(
+                                  const Duration(days: 1),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: Icon(
+                                  Icons.chevron_left,
+                                  color: colors.textSecondary,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                ref.read(selectedDateProvider.notifier).state =
+                                    DateTime.now();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.primary.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'TODAY',
+                                  style: TextStyle(
+                                    color: colors.primary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                ref.read(selectedDateProvider.notifier).state =
+                                    selectedDate.add(const Duration(days: 1));
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: Icon(
+                                  Icons.chevron_right,
+                                  color: colors.textSecondary,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  sliver: SliverToBoxAdapter(
-                    child: DailySummaryCard(selectedDate: selectedDate),
-                  ),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverToBoxAdapter(
-                    child: HabitListView(selectedDate: selectedDate),
-                  ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
-              ],
-            ),
+                sliver: SliverToBoxAdapter(
+                  child: DailySummaryCard(selectedDate: selectedDate),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverToBoxAdapter(
+                  child: HabitListView(selectedDate: selectedDate),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
           ),
         ),
       ),
@@ -92,21 +180,59 @@ class HomeScreen extends HookConsumerWidget {
 
 class _CalendarHeaderDelegate extends SliverPersistentHeaderDelegate {
   final DateTime selectedDate;
+  final List<HabitModel> habits;
   final ValueChanged<DateTime> onDateSelected;
   final VoidCallback onTodayPressed;
   final AppColorScheme colors;
 
   _CalendarHeaderDelegate({
     required this.selectedDate,
+    required this.habits,
     required this.onDateSelected,
     required this.onTodayPressed,
     required this.colors,
   });
 
   @override
-  double get minExtent => 110.0; // Reduced from 140
+  double get minExtent => 110.0;
   @override
   double get maxExtent => 400.0;
+
+  /// Get the completion ratio for a date (0.0 to 1.0)
+  double _getCompletionRatio(DateTime date) {
+    final dateOnly = DateTime(date.year, date.month, date.day);
+
+    final activeHabits = habits.where((habit) {
+      final startDate = DateTime(
+        habit.createdAt.year,
+        habit.createdAt.month,
+        habit.createdAt.day,
+      );
+      final endDate = DateTime(
+        habit.endDate.year,
+        habit.endDate.month,
+        habit.endDate.day,
+      );
+
+      final isInRange =
+          (dateOnly.isAtSameMomentAs(startDate) ||
+              dateOnly.isAfter(startDate)) &&
+          (dateOnly.isAtSameMomentAs(endDate) || dateOnly.isBefore(endDate));
+
+      if (!isInRange) return false;
+
+      if (habit.frequency == 'WEEKLY') {
+        return dateOnly.weekday == DateTime.saturday ||
+            dateOnly.weekday == DateTime.sunday;
+      }
+      return true;
+    }).toList();
+
+    if (activeHabits.isEmpty) return -1.0; // No habits for this day
+
+    final completed = activeHabits.where((h) => h.isCompletedOn(date)).length;
+    return completed / activeHabits.length;
+  }
 
   @override
   Widget build(
@@ -216,6 +342,7 @@ class _CalendarHeaderDelegate extends SliverPersistentHeaderDelegate {
                 ? _WeekStrip(
                     selectedDate: selectedDate,
                     onDateSelected: onDateSelected,
+                    getCompletionRatio: _getCompletionRatio,
                     colors: colors,
                   )
                 : Opacity(
@@ -225,6 +352,7 @@ class _CalendarHeaderDelegate extends SliverPersistentHeaderDelegate {
                       child: _MonthCalendar(
                         selectedDate: selectedDate,
                         onDateSelected: onDateSelected,
+                        getCompletionRatio: _getCompletionRatio,
                         colors: colors,
                       ),
                     ),
@@ -252,7 +380,8 @@ class _CalendarHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _CalendarHeaderDelegate oldDelegate) {
     return oldDelegate.selectedDate != selectedDate ||
-        oldDelegate.colors != colors;
+        oldDelegate.colors != colors ||
+        oldDelegate.habits != habits;
   }
 }
 
@@ -260,11 +389,13 @@ class _CalendarHeaderDelegate extends SliverPersistentHeaderDelegate {
 class _WeekStrip extends StatelessWidget {
   final DateTime selectedDate;
   final ValueChanged<DateTime> onDateSelected;
+  final double Function(DateTime) getCompletionRatio;
   final AppColorScheme colors;
 
   const _WeekStrip({
     required this.selectedDate,
     required this.onDateSelected,
+    required this.getCompletionRatio,
     required this.colors,
   });
 
@@ -286,6 +417,7 @@ class _WeekStrip extends StatelessWidget {
               date: date,
               selectedDate: selectedDate,
               onTap: () => onDateSelected(date),
+              completionRatio: getCompletionRatio(date),
               colors: colors,
               compact: true,
             ),
@@ -300,11 +432,13 @@ class _WeekStrip extends StatelessWidget {
 class _MonthCalendar extends StatelessWidget {
   final DateTime selectedDate;
   final ValueChanged<DateTime> onDateSelected;
+  final double Function(DateTime) getCompletionRatio;
   final AppColorScheme colors;
 
   const _MonthCalendar({
     required this.selectedDate,
     required this.onDateSelected,
+    required this.getCompletionRatio,
     required this.colors,
   });
   @override
@@ -371,6 +505,7 @@ class _MonthCalendar extends StatelessWidget {
                   date: date,
                   selectedDate: selectedDate,
                   onTap: () => onDateSelected(date),
+                  completionRatio: getCompletionRatio(date),
                   colors: colors,
                   compact: false,
                 );
@@ -383,7 +518,7 @@ class _MonthCalendar extends StatelessWidget {
   }
 }
 
-// ── Individual Day Card (rounded box) ──
+// ── Individual Day Card (rounded box with heatmap) ──
 class _DayCard extends StatelessWidget {
   final DateTime date;
   final DateTime selectedDate;
@@ -391,12 +526,16 @@ class _DayCard extends StatelessWidget {
   final AppColorScheme colors;
   final bool compact;
 
+  /// -1.0 = no habits for this day, 0.0 = no completion, 1.0 = all done
+  final double completionRatio;
+
   const _DayCard({
     required this.date,
     required this.selectedDate,
     required this.onTap,
     required this.colors,
     required this.compact,
+    required this.completionRatio,
   });
 
   @override
@@ -408,6 +547,13 @@ class _DayCard extends StatelessWidget {
     final now = DateTime.now();
     final isToday =
         date.day == now.day && date.month == now.month && date.year == now.year;
+
+    // Don't show heatmap for future dates
+    final isFuture = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).isAfter(DateTime(now.year, now.month, now.day));
 
     // Colors
     Color bgColor;
@@ -429,6 +575,22 @@ class _DayCard extends StatelessWidget {
     }
 
     final dayName = DateFormat('E').format(date).toUpperCase().substring(0, 3);
+
+    // Heatmap dot color (GitHub-style intensity)
+    final bool showDot = !isFuture && completionRatio >= 0;
+    Color? dotColor;
+    if (showDot && completionRatio > 0) {
+      // 4 intensity levels like GitHub
+      if (completionRatio >= 1.0) {
+        dotColor = colors.primary; // Full intensity
+      } else if (completionRatio >= 0.66) {
+        dotColor = colors.primary.withOpacity(0.7);
+      } else if (completionRatio >= 0.33) {
+        dotColor = colors.primary.withOpacity(0.45);
+      } else {
+        dotColor = colors.primary.withOpacity(0.25);
+      }
+    }
 
     return GestureDetector(
       onTap: onTap,
@@ -477,6 +639,26 @@ class _DayCard extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
+            // Heatmap indicator dot
+            if (showDot) ...[
+              const SizedBox(height: 3),
+              completionRatio >= 1.0
+                  ? Icon(
+                      Icons.check_circle,
+                      size: 10,
+                      color: isSelected
+                          ? colors.calendarSelectedText
+                          : colors.primary,
+                    )
+                  : Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: dotColor ?? colors.textMuted.withOpacity(0.25),
+                      ),
+                    ),
+            ],
           ],
         ),
       ),

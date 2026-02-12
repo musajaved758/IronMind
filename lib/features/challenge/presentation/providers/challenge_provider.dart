@@ -111,6 +111,15 @@ class ChallengeNotifier extends Notifier<List<ChallengeModel>> {
     ref.invalidateSelf();
   }
 
+  Future<void> extendChallenge(String id, int extraDays) async {
+    final challenge = state.firstWhere((c) => c.id == id);
+    final updatedChallenge = challenge.copyWith(
+      duration: challenge.duration + extraDays,
+    );
+    await HiveService.updateChallenge(updatedChallenge);
+    ref.invalidateSelf();
+  }
+
   ChallengeModel? get activeChallenge {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

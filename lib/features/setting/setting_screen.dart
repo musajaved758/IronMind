@@ -66,9 +66,115 @@ class SettingScreen extends HookConsumerWidget {
                   Switch(
                     value: ref.watch(swapHomeAndChallengeProvider),
                     onChanged: (val) {
-                      ref.read(swapHomeAndChallengeProvider.notifier).state = val;
+                      ref.read(swapHomeAndChallengeProvider.notifier).state =
+                          val;
                     },
                     activeColor: colors.primary,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: colors.border.withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_month, color: colors.textSecondary),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Show Habit Calendar',
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Switch(
+                    value: ref.watch(showHabitCalendarProvider),
+                    onChanged: (val) {
+                      ref.read(showHabitCalendarProvider.notifier).state = val;
+                    },
+                    activeColor: colors.primary,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: colors.border.withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.flag, color: colors.textSecondary),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Max Active Challenges',
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.chipBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: colors.border.withOpacity(0.5)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: ref.watch(maxChallengesProvider),
+                        isDense: true,
+                        menuMaxHeight: 250,
+                        dropdownColor: colors.dialogBg,
+                        borderRadius: BorderRadius.circular(12),
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        icon: Icon(
+                          Icons.expand_more,
+                          color: colors.textSecondary,
+                          size: 18,
+                        ),
+                        items: List.generate(20, (i) => i + 1).map((val) {
+                          return DropdownMenuItem(
+                            value: val,
+                            child: Text('$val'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            ref.read(maxChallengesProvider.notifier).state =
+                                val;
+                          }
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -78,12 +184,7 @@ class SettingScreen extends HookConsumerWidget {
             const SizedBox(height: 16),
             _buildInfoCard('Version', '1.0.0', Icons.info_outline, colors),
             const SizedBox(height: 12),
-            _buildInfoCard(
-              'Developer',
-              'Operation Brotherhood',
-              Icons.code,
-              colors,
-            ),
+            _buildInfoCard('Developer', 'Coding Geeks', Icons.code, colors),
           ],
         ),
       ),

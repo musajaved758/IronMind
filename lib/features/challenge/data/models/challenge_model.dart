@@ -123,20 +123,63 @@ class ChallengeModel {
     );
   }
 
+  bool get isCompleted {
+    final endDate = startDate.add(Duration(days: duration));
+    final now = DateTime.now();
+    return now.isAfter(endDate);
+  }
+
   int get daysElapsed {
     final now = DateTime.now();
     final difference = now.difference(startDate).inDays;
-    return difference >= 0 ? difference : 0;
+    // If it's the first day, difference is 0, so we return 1.
+    return difference >= 0 ? difference + 1 : 1;
   }
 
   int get daysRemaining {
-    final remaining = duration - daysElapsed;
+    final remaining =
+        duration - (daysElapsed - 1); // -1 because daysElapsed is 1-based
     return remaining >= 0 ? remaining : 0;
   }
 
   double get progress {
     if (duration == 0) return 0.0;
     return completedDates.length / duration;
+  }
+
+  /// Returns the day range for a milestone (e.g. [1, 7])
+  List<int> getMilestoneDayRange(int milestoneIndex) {
+    if (milestoneIndex < 0 || milestoneIndex >= roadmap.length) return [];
+
+    int startDay = 1;
+    for (int i = 0; i < milestoneIndex; i++) {
+      startDay += roadmap[i].durationDays;
+    }
+    int endDay = startDay + roadmap[milestoneIndex].durationDays - 1;
+    return [startDay, endDay];
+  }
+
+  /// Checks if a milestone is completed based on the mission log
+  bool isMilestoneCompleted(int milestoneIndex) {
+    final range = getMilestoneDayRange(milestoneIndex);
+    if (range.isEmpty) return false;
+
+    final startDay = range[0];
+    final endDay = range[1];
+
+    // Total days in this milestone
+    final totalDaysInMilestone = endDay - startDay + 1;
+
+    // Count how many of these days are in completedDates
+    int completedCount = 0;
+    for (int day = startDay; day <= endDay; day++) {
+      final targetDate = startDate.add(Duration(days: day - 1));
+      if (isCompletedOn(targetDate)) {
+        completedCount++;
+      }
+    }
+
+    return completedCount == totalDaysInMilestone;
   }
 
   int get currentStreak {
@@ -175,6 +218,31 @@ class ChallengeModel {
       }
     }
     return streak;
+  }
+
+  int get longestStreak {
+    if (completedDates.isEmpty) return 0;
+
+    final uniqueDates =
+        completedDates
+            .map((d) => DateTime(d.year, d.month, d.day))
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.compareTo(b));
+
+    if (uniqueDates.isEmpty) return 0;
+
+    int longest = 1;
+    int current = 1;
+    for (int i = 1; i < uniqueDates.length; i++) {
+      if (uniqueDates[i].difference(uniqueDates[i - 1]).inDays == 1) {
+        current++;
+        if (current > longest) longest = current;
+      } else {
+        current = 1;
+      }
+    }
+    return longest;
   }
 
   ChallengeModel copyWith({

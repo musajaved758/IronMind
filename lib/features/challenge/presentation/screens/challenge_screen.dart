@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:iron_mind/core/utils/colors.dart';
+import 'package:iron_mind/core/providers/app_providers.dart';
 import 'package:iron_mind/features/challenge/presentation/providers/challenge_provider.dart';
 import 'package:iron_mind/features/challenge/data/models/challenge_model.dart';
-import 'package:iron_mind/features/habit/habit_screen.dart';
 import 'package:iron_mind/features/challenge/presentation/screens/challenge_detail_screen.dart';
+import 'package:iron_mind/features/intel/presentation/providers/stats_provider.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+
+import 'package:iron_mind/features/challenge/presentation/screens/create_challenge_screen.dart';
 
 class ChallengeScreen extends HookConsumerWidget {
   const ChallengeScreen({super.key});
@@ -12,11 +16,52 @@ class ChallengeScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allChallenges = ref.watch(challengeProvider);
-    final challenges = allChallenges.take(5).toList();
+    final maxChallenges = ref.watch(maxChallengesProvider);
+    final stats = ref.watch(challengeStatsProvider);
     final colors = Theme.of(context).appColors;
+
+    // Use same ongoing/completed logic as stats provider
+    final ongoing = stats.activeChallenges;
+    final completed = allChallenges.where((c) {
+      final endDate = c.startDate.add(Duration(days: c.duration));
+      final now = DateTime.now();
+      return endDate.isBefore(now) || endDate.isAtSameMomentAs(now);
+    }).toList();
+
+    // Only show up to maxChallenges ongoing challenges
+    final visibleOngoing = ongoing.take(maxChallenges).toList();
 
     return Scaffold(
       backgroundColor: colors.bg,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80), // Avoid overlap with NavBar
+        child: FloatingActionButton(
+          backgroundColor: colors.primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(200),
+          ),
+          onPressed: () {
+            if (ongoing.length >= maxChallenges) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'You have reached the max of $maxChallenges active challenges',
+                  ),
+                  backgroundColor: AppColors.highPriorityColor,
+                ),
+              );
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CreateChallengeScreen(),
+              ),
+            );
+          },
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+      ),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -32,19 +77,197 @@ class ChallengeScreen extends HookConsumerWidget {
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      body: challenges.isEmpty
-          ? _buildEmptyState(colors)
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: challenges.length,
-              itemBuilder: (context, index) {
-                final challenge = challenges[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 20.0),
-                  child: _buildChallengeCard(context, ref, challenge, colors),
-                );
-              },
+      body: SafeArea(
+        top: false,
+        child: allChallenges.isEmpty
+            ? _buildEmptyState(colors)
+            : ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  // Radial progress card — same values as Intel screen
+                  _buildRadialProgress(stats, colors),
+                  const SizedBox(height: 24),
+                  // ONGOING challenges
+                  if (visibleOngoing.isNotEmpty) ...[
+                    _sectionHeader(
+                      'ACTIVE MISSIONS (${visibleOngoing.length})',
+                      colors,
+                    ),
+                    const SizedBox(height: 16),
+                    ...visibleOngoing.map(
+                      (c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: _buildChallengeCard(context, ref, c, colors),
+                      ),
+                    ),
+                  ],
+                  if (visibleOngoing.isEmpty && completed.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Center(
+                        child: Text(
+                          'All missions completed!',
+                          style: TextStyle(
+                            color: colors.textMuted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // COMPLETED challenges
+                  if (completed.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _sectionHeader('COMPLETED (${completed.length})', colors),
+                    const SizedBox(height: 16),
+                    ...completed.map(
+                      (c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildCompletedCard(context, c, colors),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 80),
+                ],
+              ),
+      ),
+    );
+  }
+
+  /// Radial progress card — uses same stats provider as IntelScreen for consistency
+  Widget _buildRadialProgress(
+    ChallengeIntelStats stats,
+    AppColorScheme colors,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.border.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            height: 120,
+            width: 120,
+            child: SfCircularChart(
+              margin: EdgeInsets.zero,
+              annotations: <CircularChartAnnotation>[
+                CircularChartAnnotation(
+                  widget: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${(stats.overallCompletionRate * 100).toInt()}%',
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'TOTAL',
+                        style: TextStyle(color: colors.textMuted, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              series: <CircularSeries>[
+                DoughnutSeries<_PieData, String>(
+                  dataSource: [
+                    _PieData(
+                      'Completed',
+                      stats.overallCompletionRate * 100,
+                      colors.primary,
+                    ),
+                    _PieData(
+                      'Remaining',
+                      (1 - stats.overallCompletionRate) * 100,
+                      colors.progressBarBg,
+                    ),
+                  ],
+                  xValueMapper: (_PieData d, _) => d.label,
+                  yValueMapper: (_PieData d, _) => d.value,
+                  pointColorMapper: (_PieData d, _) => d.color,
+                  innerRadius: '75%',
+                  radius: '100%',
+                ),
+              ],
             ),
+          ),
+          const SizedBox(width: 30),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _statRow(
+                  'TOTAL',
+                  stats.totalChallenges.toString(),
+                  colors.textPrimary,
+                  colors,
+                ),
+                const SizedBox(height: 12),
+                _statRow(
+                  'COMPLETED',
+                  stats.completedChallenges.toString(),
+                  colors.primary,
+                  colors,
+                ),
+                const SizedBox(height: 12),
+                _statRow(
+                  'ONGOING',
+                  stats.ongoingChallenges.toString(),
+                  colors.accent,
+                  colors,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statRow(
+    String label,
+    String value,
+    Color valueColor,
+    AppColorScheme colors,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionHeader(String title, AppColorScheme colors) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: colors.textSecondary,
+        fontSize: 12,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 1.5,
+      ),
     );
   }
 
@@ -129,7 +352,7 @@ class ChallengeScreen extends HookConsumerWidget {
                                 ),
                                 const SizedBox(width: 8),
                                 _statusBadge(
-                                  'DAY ${challenge.daysElapsed + 1}',
+                                  'DAY ${challenge.daysElapsed}',
                                   colors.textMuted,
                                 ),
                               ],
@@ -159,8 +382,9 @@ class ChallengeScreen extends HookConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    HabitScreen(challengeToEdit: challenge),
+                                builder: (context) => CreateChallengeScreen(
+                                  challengeToEdit: challenge,
+                                ),
                               ),
                             );
                           }
@@ -284,6 +508,66 @@ class ChallengeScreen extends HookConsumerWidget {
     );
   }
 
+  /// Compact card for completed challenges (no mark-complete button)
+  Widget _buildCompletedCard(
+    BuildContext context,
+    ChallengeModel challenge,
+    AppColorScheme colors,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChallengeDetailScreen(challenge: challenge),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colors.primary.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.check_circle, color: colors.primary, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    challenge.name,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${challenge.duration} days · ${challenge.completedDates.length} completions',
+                    style: TextStyle(color: colors.textMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: colors.textMuted, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _statusBadge(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -346,4 +630,11 @@ class ChallengeScreen extends HookConsumerWidget {
       ),
     );
   }
+}
+
+class _PieData {
+  final String label;
+  final double value;
+  final Color color;
+  _PieData(this.label, this.value, this.color);
 }

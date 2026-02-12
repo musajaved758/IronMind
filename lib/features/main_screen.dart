@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:iron_mind/core/utils/colors.dart';
 import 'package:iron_mind/core/widgets/custom_nav_bar.dart';
 import 'package:iron_mind/core/utils/barrels/screens.dart';
 import 'package:iron_mind/core/providers/app_providers.dart';
@@ -13,40 +12,34 @@ class MainScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(navIndexProvider);
     final isSwapped = ref.watch(swapHomeAndChallengeProvider);
-    final colors = Theme.of(context).appColors;
+    final hasPhases = ref.watch(hasAnyPhasesProvider);
 
-    final pages = isSwapped
-        ? [
-            const ChallengeScreen(),
-            const HomeScreen(),
-            const PhaseScreen(),
-            const IntelScreen(),
-            const SettingScreen(),
-          ]
-        : [
-            const HomeScreen(),
-            const ChallengeScreen(),
-            const PhaseScreen(),
-            const IntelScreen(),
-            const SettingScreen(),
-          ];
+    // Build pages dynamically — skip PhaseScreen if no phases
+    final pages = <Widget>[];
+
+    if (isSwapped) {
+      pages.add(const ChallengeScreen());
+      pages.add(const HomeScreen());
+    } else {
+      pages.add(const HomeScreen());
+      pages.add(const ChallengeScreen());
+    }
+
+    if (hasPhases) {
+      pages.add(const PhaseScreen());
+    }
+
+    pages.add(const IntelScreen());
+    pages.add(const SettingScreen());
+
+    // Clamp index to avoid out-of-bounds
+    final safeIndex = currentIndex.clamp(0, pages.length - 1);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: colors.primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(200)),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HabitScreen()),
-          );
-        },
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
       extendBody: true,
-      body: IndexedStack(index: currentIndex, children: pages),
+      body: IndexedStack(index: safeIndex, children: pages),
       bottomNavigationBar: CustomNavBar(
-        selectedIndex: currentIndex,
+        selectedIndex: safeIndex,
         onTap: (index) {
           ref.read(navIndexProvider.notifier).state = index;
         },

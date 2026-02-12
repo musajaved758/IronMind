@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iron_mind/features/habit/presentation/providers/habit_provider.dart';
+import 'package:iron_mind/features/habit/data/models/habit_model.dart';
 import 'package:iron_mind/features/challenge/presentation/providers/challenge_provider.dart';
 import 'package:iron_mind/features/challenge/data/models/challenge_model.dart';
 
@@ -14,6 +15,9 @@ class ChallengeIntelStats {
   final Map<DateTime, int>
   monthlyProgress; // Date -> count of challenges completed
   final List<ChallengeModel> activeChallenges;
+  final List<ChallengeModel> allChallenges;
+  final int bestCurrentStreak;
+  final int bestLongestStreak;
 
   ChallengeIntelStats({
     required this.totalChallenges,
@@ -23,6 +27,9 @@ class ChallengeIntelStats {
     required this.completionHistory,
     required this.monthlyProgress,
     required this.activeChallenges,
+    required this.allChallenges,
+    required this.bestCurrentStreak,
+    required this.bestLongestStreak,
   });
 }
 
@@ -32,6 +39,9 @@ class HabitIntelStats {
   final int missedToday;
   final Map<DateTime, int> weeklyTrend; // Last 7 days trend
   final List<HabitDetailStats> habitDetails;
+  final int bestCurrentStreak;
+  final int bestLongestStreak;
+  final List<HabitModel> allHabits;
 
   HabitIntelStats({
     required this.totalHabits,
@@ -39,6 +49,9 @@ class HabitIntelStats {
     required this.missedToday,
     required this.weeklyTrend,
     required this.habitDetails,
+    required this.bestCurrentStreak,
+    required this.bestLongestStreak,
+    required this.allHabits,
   });
 }
 
@@ -107,6 +120,13 @@ final challengeStatsProvider = Provider<ChallengeIntelStats>((ref) {
     }
   }
 
+  int bestCurrent = 0;
+  int bestLongest = 0;
+  for (final c in challenges) {
+    if (c.currentStreak > bestCurrent) bestCurrent = c.currentStreak;
+    if (c.longestStreak > bestLongest) bestLongest = c.longestStreak;
+  }
+
   return ChallengeIntelStats(
     totalChallenges: challenges.length,
     completedChallenges: completed.length,
@@ -117,6 +137,9 @@ final challengeStatsProvider = Provider<ChallengeIntelStats>((ref) {
     completionHistory: history,
     monthlyProgress: monthlyProgress,
     activeChallenges: ongoing,
+    allChallenges: challenges,
+    bestCurrentStreak: bestCurrent,
+    bestLongestStreak: bestLongest,
   );
 });
 
@@ -163,10 +186,18 @@ final habitStatsProvider = Provider<HabitIntelStats>((ref) {
       name: h.name,
       completionRate: rate.clamp(0.0, 1.0),
       currentStreak: streak,
-      bestStreak:
-          streak, // Best streak calculation would require more iteration
+      bestStreak: h.longestStreak,
     );
   }).toList();
+
+  int bestHabitCurrent = 0;
+  int bestHabitLongest = 0;
+  for (final detail in habitDetails) {
+    if (detail.currentStreak > bestHabitCurrent)
+      bestHabitCurrent = detail.currentStreak;
+    if (detail.bestStreak > bestHabitLongest)
+      bestHabitLongest = detail.bestStreak;
+  }
 
   return HabitIntelStats(
     totalHabits: habits.length,
@@ -174,5 +205,8 @@ final habitStatsProvider = Provider<HabitIntelStats>((ref) {
     missedToday: habits.length - completedToday,
     weeklyTrend: weeklyTrend,
     habitDetails: habitDetails,
+    bestCurrentStreak: bestHabitCurrent,
+    bestLongestStreak: bestHabitLongest,
+    allHabits: habits,
   );
 });

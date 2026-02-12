@@ -1,8 +1,18 @@
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iron_mind/features/challenge/presentation/providers/challenge_provider.dart';
 
 /// Provider for the bottom navigation bar index
 final navIndexProvider = StateProvider<int>((ref) => 0);
 final swapHomeAndChallengeProvider = StateProvider<bool>((ref) => false);
+final showHabitCalendarProvider = StateProvider<bool>((ref) => true);
+final maxChallengesProvider = StateProvider<int>((ref) => 5);
+
+/// Whether any challenge has phases/roadmap — controls Phases tab visibility
+final hasAnyPhasesProvider = Provider<bool>((ref) {
+  final challenges = ref.watch(challengeProvider);
+  return challenges.any((c) => !c.isCompleted && c.roadmap.isNotEmpty);
+});
 
 /// Provider for the selected calendar date
 final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
