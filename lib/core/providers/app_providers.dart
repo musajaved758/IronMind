@@ -6,7 +6,22 @@ import 'package:iron_mind/features/challenge/presentation/providers/challenge_pr
 
 /// Provider for the bottom navigation bar index
 final navIndexProvider = StateProvider<int>((ref) => 0);
-final maxChallengesProvider = StateProvider<int>((ref) => 5);
+final maxChallengesProvider = NotifierProvider<MaxChallengesNotifier, int>(
+  MaxChallengesNotifier.new,
+);
+
+class MaxChallengesNotifier extends Notifier<int> {
+  @override
+  int build() {
+    return HiveService.getSetting('max_challenges', defaultValue: 5);
+  }
+
+  void set(int value) {
+    state = value;
+    HiveService.saveSetting('max_challenges', value);
+  }
+}
+
 final notificationsEnabledProvider =
     NotifierProvider<NotificationsEnabledNotifier, bool>(
       NotificationsEnabledNotifier.new,

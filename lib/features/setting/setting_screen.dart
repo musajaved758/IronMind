@@ -127,7 +127,7 @@ class SettingScreen extends HookConsumerWidget {
                 }).toList(),
                 onChanged: (val) {
                   if (val != null) {
-                    ref.read(maxChallengesProvider.notifier).state = val;
+                    ref.read(maxChallengesProvider.notifier).set(val);
                   }
                 },
               ),
@@ -310,7 +310,7 @@ class SettingScreen extends HookConsumerWidget {
     AppColorScheme colors,
   ) {
     return InkWell(
-      onTap: () => ref.read(themeModeProvider.notifier).state = mode,
+      onTap: () => ref.read(themeModeProvider.notifier).set(mode),
       borderRadius: BorderRadius.circular(20),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
