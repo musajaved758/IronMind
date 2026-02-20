@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:iron_mind/core/utils/colors.dart';
-import 'package:iron_mind/features/habit/presentation/providers/habit_provider.dart';
+import 'package:iron_mind/features/challenge/presentation/providers/challenge_provider.dart';
 import 'package:intl/intl.dart';
 
 class DailySummaryCard extends HookConsumerWidget {
@@ -11,43 +11,34 @@ class DailySummaryCard extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final habits = ref.watch(habitProvider);
+    final challenges = ref.watch(challengeProvider);
     final colors = Theme.of(context).appColors;
 
-    final activeHabits = habits.where((habit) {
+    // Filter active challenges for the selected date
+    final activeChallenges = challenges.where((challenge) {
       final date = DateTime(
         selectedDate.year,
         selectedDate.month,
         selectedDate.day,
       );
       final startDate = DateTime(
-        habit.createdAt.year,
-        habit.createdAt.month,
-        habit.createdAt.day,
+        challenge.startDate.year,
+        challenge.startDate.month,
+        challenge.startDate.day,
       );
-      final endDate = DateTime(
-        habit.endDate.year,
-        habit.endDate.month,
-        habit.endDate.day,
+      final endDate = challenge.startDate.add(
+        Duration(days: challenge.duration),
       );
+      final endDateOnly = DateTime(endDate.year, endDate.month, endDate.day);
 
-      final isInRange =
-          (date.isAtSameMomentAs(startDate) || date.isAfter(startDate)) &&
-          (date.isAtSameMomentAs(endDate) || date.isBefore(endDate));
-
-      if (!isInRange) return false;
-
-      if (habit.frequency == 'WEEKLY') {
-        return date.weekday == DateTime.saturday ||
-            date.weekday == DateTime.sunday;
-      }
-      return true;
+      return (date.isAtSameMomentAs(startDate) || date.isAfter(startDate)) &&
+          (date.isAtSameMomentAs(endDateOnly) || date.isBefore(endDateOnly));
     }).toList();
 
-    final completedTask = activeHabits
-        .where((habit) => habit.isCompletedOn(selectedDate))
+    final completedTask = activeChallenges
+        .where((c) => c.isCompletedOn(selectedDate))
         .length;
-    final totalTask = activeHabits.length;
+    final totalTask = activeChallenges.length;
     final efficiencyPercentage = totalTask > 0
         ? (completedTask / totalTask) * 100
         : 0.0;
@@ -57,7 +48,7 @@ class DailySummaryCard extends HookConsumerWidget {
     Color statusColor = colors.primary;
 
     if (totalTask == 0) {
-      status = "NO HABITS";
+      status = "NO CHALLENGES";
       statusColor = colors.textMuted;
     } else if (completedTask == totalTask) {
       status = "COMPLETED";

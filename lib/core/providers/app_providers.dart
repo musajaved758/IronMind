@@ -6,8 +6,6 @@ import 'package:iron_mind/features/challenge/presentation/providers/challenge_pr
 
 /// Provider for the bottom navigation bar index
 final navIndexProvider = StateProvider<int>((ref) => 0);
-final swapHomeAndChallengeProvider = StateProvider<bool>((ref) => false);
-final showHabitCalendarProvider = StateProvider<bool>((ref) => true);
 final maxChallengesProvider = StateProvider<int>((ref) => 5);
 final notificationsEnabledProvider =
     NotifierProvider<NotificationsEnabledNotifier, bool>(

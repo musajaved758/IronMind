@@ -11,8 +11,7 @@ class IntelScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pageController = usePageController();
-    final currentPage = useState(0);
+    final stats = ref.watch(challengeStatsProvider);
     final colors = Theme.of(context).appColors;
 
     return Scaffold(
@@ -33,90 +32,40 @@ class IntelScreen extends HookConsumerWidget {
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          children: [
-            _buildToggle(currentPage, pageController, colors),
-            Expanded(
-              child: PageView(
-                controller: pageController,
-                onPageChanged: (index) => currentPage.value = index,
-                children: const [_ChallengesView(), _HabitsView()],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggle(
-    ValueNotifier<int> currentPage,
-    PageController pageController,
-    AppColorScheme colors,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _toggleItem(
-                'CHALLENGES',
-                currentPage.value == 0,
-                () => pageController.animateToPage(
-                  0,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader('OVERALL CHALLENGE PROGRESS', colors),
+              const SizedBox(height: 20),
+              _buildRadialProgress(stats, colors),
+              const SizedBox(height: 20),
+              _buildStreakCards(
+                stats.bestCurrentStreak,
+                stats.bestLongestStreak,
                 colors,
               ),
-            ),
-            Expanded(
-              child: _toggleItem(
-                'HABITS',
-                currentPage.value == 1,
-                () => pageController.animateToPage(
-                  1,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                ),
-                colors,
+              const SizedBox(height: 40),
+              _sectionHeader('STREAK & CONSISTENCY', colors),
+              const SizedBox(height: 20),
+              _ConsistencyCalendar(
+                monthlyProgress: stats.monthlyProgress,
+                computeDayCount: (date) {
+                  int count = 0;
+                  for (final c in stats.allChallenges) {
+                    if (c.isCompletedOn(date)) count++;
+                  }
+                  return count;
+                },
+                colors: colors,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _toggleItem(
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-    AppColorScheme colors,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: isSelected ? colors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : colors.textMuted,
-            fontWeight: FontWeight.w900,
-            fontSize: 12,
-            letterSpacing: 1.1,
+              const SizedBox(height: 40),
+              _sectionHeader('PROGRESS OVER TIME', colors),
+              const SizedBox(height: 20),
+              _buildProgressChart(stats.completionHistory, colors),
+              const SizedBox(height: 100),
+            ],
           ),
         ),
       ),
@@ -125,512 +74,189 @@ class IntelScreen extends HookConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CHALLENGES TAB
+// CHALLENGE WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ChallengesView extends HookConsumerWidget {
-  const _ChallengesView();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stats = ref.watch(challengeStatsProvider);
-    final colors = Theme.of(context).appColors;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionHeader('OVERALL CHALLENGE PROGRESS', colors),
-          const SizedBox(height: 20),
-          _buildRadialProgress(stats, colors),
-          const SizedBox(height: 20),
-          _buildStreakCards(
-            stats.bestCurrentStreak,
-            stats.bestLongestStreak,
-            colors,
-          ),
-          const SizedBox(height: 40),
-          _sectionHeader('STREAK & CONSISTENCY', colors),
-          const SizedBox(height: 20),
-          _ConsistencyCalendar(
-            monthlyProgress: stats.monthlyProgress,
-            computeDayCount: (date) {
-              int count = 0;
-              for (final c in stats.allChallenges) {
-                if (c.isCompletedOn(date)) count++;
-              }
-              return count;
-            },
-            colors: colors,
-          ),
-          const SizedBox(height: 40),
-          _sectionHeader('PROGRESS OVER TIME', colors),
-          const SizedBox(height: 20),
-          _buildProgressChart(stats.completionHistory, colors),
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRadialProgress(
-    ChallengeIntelStats stats,
-    AppColorScheme colors,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colors.border.withOpacity(0.5)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 120,
-            width: 120,
-            child: SfCircularChart(
-              margin: EdgeInsets.zero,
-              annotations: <CircularChartAnnotation>[
-                CircularChartAnnotation(
-                  widget: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${(stats.overallCompletionRate * 100).toInt()}%',
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
+Widget _buildRadialProgress(ChallengeIntelStats stats, AppColorScheme colors) {
+  return Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: colors.border.withOpacity(0.5)),
+    ),
+    child: Row(
+      children: [
+        SizedBox(
+          height: 120,
+          width: 120,
+          child: SfCircularChart(
+            margin: EdgeInsets.zero,
+            annotations: <CircularChartAnnotation>[
+              CircularChartAnnotation(
+                widget: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${(stats.overallCompletionRate * 100).toInt()}%',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
-                      Text(
-                        'TOTAL',
-                        style: TextStyle(color: colors.textMuted, fontSize: 8),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              series: <CircularSeries>[
-                DoughnutSeries<_PieData, String>(
-                  dataSource: [
-                    _PieData(
-                      'Completed',
-                      stats.overallCompletionRate * 100,
-                      colors.primary,
                     ),
-                    _PieData(
-                      'Remaining',
-                      (1 - stats.overallCompletionRate) * 100,
-                      colors.progressBarBg,
+                    Text(
+                      'TOTAL',
+                      style: TextStyle(color: colors.textMuted, fontSize: 8),
                     ),
                   ],
-                  xValueMapper: (_PieData d, _) => d.label,
-                  yValueMapper: (_PieData d, _) => d.value,
-                  pointColorMapper: (_PieData d, _) => d.color,
-                  innerRadius: '75%',
-                  radius: '100%',
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 30),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _statRow(
-                  'TOTAL',
-                  stats.totalChallenges.toString(),
-                  colors.textPrimary,
-                  colors,
-                ),
-                const SizedBox(height: 12),
-                _statRow(
-                  'COMPLETED',
-                  stats.completedChallenges.toString(),
-                  colors.primary,
-                  colors,
-                ),
-                const SizedBox(height: 12),
-                _statRow(
-                  'ONGOING',
-                  stats.ongoingChallenges.toString(),
-                  colors.accent,
-                  colors,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statRow(
-    String label,
-    String value,
-    Color valueColor,
-    AppColorScheme colors,
-  ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: colors.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
+              ),
+            ],
+            series: <CircularSeries>[
+              DoughnutSeries<_PieData, String>(
+                dataSource: [
+                  _PieData(
+                    'Completed',
+                    stats.overallCompletionRate * 100,
+                    colors.primary,
+                  ),
+                  _PieData(
+                    'Remaining',
+                    (1 - stats.overallCompletionRate) * 100,
+                    colors.progressBarBg,
+                  ),
+                ],
+                xValueMapper: (_PieData d, _) => d.label,
+                yValueMapper: (_PieData d, _) => d.value,
+                pointColorMapper: (_PieData d, _) => d.color,
+                innerRadius: '75%',
+                radius: '100%',
+              ),
+            ],
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
+        const SizedBox(width: 30),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _statRow(
+                'TOTAL',
+                stats.totalChallenges.toString(),
+                colors.textPrimary,
+                colors,
+              ),
+              const SizedBox(height: 12),
+              _statRow(
+                'COMPLETED',
+                stats.completedChallenges.toString(),
+                colors.primary,
+                colors,
+              ),
+              const SizedBox(height: 12),
+              _statRow(
+                'ONGOING',
+                stats.ongoingChallenges.toString(),
+                colors.accent,
+                colors,
+              ),
+            ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildProgressChart(
-    Map<DateTime, int> history,
-    AppColorScheme colors,
-  ) {
-    final sortedDates = history.keys.toList()..sort();
-    final dataPoints = sortedDates
-        .map((date) => _TimeData(date, history[date]!.toDouble()))
-        .toList();
-
-    return Container(
-      height: 220,
-      padding: const EdgeInsets.fromLTRB(10, 20, 20, 10),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colors.border.withOpacity(0.5)),
-      ),
-      child: SfCartesianChart(
-        plotAreaBorderWidth: 0,
-        primaryXAxis: DateTimeAxis(
-          majorGridLines: const MajorGridLines(width: 0),
-          axisLine: AxisLine(color: colors.border),
-          labelStyle: TextStyle(color: colors.textMuted, fontSize: 9),
-          dateFormat: DateFormat.Md(),
-          intervalType: DateTimeIntervalType.days,
-          interval: 7,
-        ),
-        primaryYAxis: NumericAxis(
-          majorGridLines: MajorGridLines(
-            color: colors.border.withOpacity(0.3),
-            dashArray: const [4, 4],
-          ),
-          axisLine: const AxisLine(width: 0),
-          labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
-        ),
-        tooltipBehavior: TooltipBehavior(enable: true),
-        series: <CartesianSeries>[
-          SplineAreaSeries<_TimeData, DateTime>(
-            dataSource: dataPoints,
-            xValueMapper: (_TimeData d, _) => d.date,
-            yValueMapper: (_TimeData d, _) => d.value,
-            color: colors.primary,
-            borderColor: colors.primary,
-            borderWidth: 3,
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                colors.primary.withOpacity(0.3),
-                colors.primary.withOpacity(0.0),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HABITS TAB
-// ─────────────────────────────────────────────────────────────────────────────
+Widget _statRow(
+  String label,
+  String value,
+  Color valueColor,
+  AppColorScheme colors,
+) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          color: colors.textMuted,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          color: valueColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ],
+  );
+}
 
-class _HabitsView extends HookConsumerWidget {
-  const _HabitsView();
+Widget _buildProgressChart(Map<DateTime, int> history, AppColorScheme colors) {
+  final sortedDates = history.keys.toList()..sort();
+  final dataPoints = sortedDates
+      .map((date) => _TimeData(date, history[date]!.toDouble()))
+      .toList();
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final stats = ref.watch(habitStatsProvider);
-    final colors = Theme.of(context).appColors;
-
-    // Build monthly progress for habits (same structure as challenges)
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
-    final Map<DateTime, int> habitMonthlyProgress = {};
-    for (int i = 0; i < daysInMonth; i++) {
-      final date = startOfMonth.add(Duration(days: i));
-      int count = 0;
-      for (final h in stats.allHabits) {
-        if (h.isCompletedOn(date)) count++;
-      }
-      habitMonthlyProgress[date] = count;
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionHeader('HABIT COMPLETION OVERVIEW', colors),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _miniStat(
-                  'TOTAL',
-                  stats.totalHabits.toString(),
-                  colors.accent,
-                  colors,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _miniStat(
-                  'DONE TODAY',
-                  stats.completedToday.toString(),
-                  colors.primary,
-                  colors,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _miniStat(
-                  'MISSED',
-                  stats.missedToday.toString(),
-                  AppColors.highPriorityColor,
-                  colors,
-                ),
-              ),
+  return Container(
+    height: 220,
+    padding: const EdgeInsets.fromLTRB(10, 20, 20, 10),
+    decoration: BoxDecoration(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: colors.border.withOpacity(0.5)),
+    ),
+    child: SfCartesianChart(
+      plotAreaBorderWidth: 0,
+      primaryXAxis: DateTimeAxis(
+        majorGridLines: const MajorGridLines(width: 0),
+        axisLine: AxisLine(color: colors.border),
+        labelStyle: TextStyle(color: colors.textMuted, fontSize: 9),
+        dateFormat: DateFormat.Md(),
+        intervalType: DateTimeIntervalType.days,
+        interval: 7,
+      ),
+      primaryYAxis: NumericAxis(
+        majorGridLines: MajorGridLines(
+          color: colors.border.withOpacity(0.3),
+          dashArray: const [4, 4],
+        ),
+        axisLine: const AxisLine(width: 0),
+        labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
+      ),
+      tooltipBehavior: TooltipBehavior(enable: true),
+      series: <CartesianSeries>[
+        SplineAreaSeries<_TimeData, DateTime>(
+          dataSource: dataPoints,
+          xValueMapper: (_TimeData d, _) => d.date,
+          yValueMapper: (_TimeData d, _) => d.value,
+          color: colors.primary,
+          borderColor: colors.primary,
+          borderWidth: 3,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colors.primary.withOpacity(0.3),
+              colors.primary.withOpacity(0.0),
             ],
           ),
-          const SizedBox(height: 20),
-          _buildStreakCards(
-            stats.bestCurrentStreak,
-            stats.bestLongestStreak,
-            colors,
-          ),
-          const SizedBox(height: 40),
-          _sectionHeader('STREAK & CONSISTENCY', colors),
-          const SizedBox(height: 20),
-          _ConsistencyCalendar(
-            monthlyProgress: habitMonthlyProgress,
-            computeDayCount: (date) {
-              int count = 0;
-              for (final h in stats.allHabits) {
-                if (h.isCompletedOn(date)) count++;
-              }
-              return count;
-            },
-            colors: colors,
-          ),
-          const SizedBox(height: 40),
-          _sectionHeader('DAILY HABIT TREND', colors),
-          const SizedBox(height: 20),
-          _buildWeeklyBarChart(stats.weeklyTrend, colors),
-          const SizedBox(height: 40),
-          _sectionHeader('HABIT-WISE PROGRESS', colors),
-          const SizedBox(height: 20),
-          ...stats.habitDetails.map((h) => _buildHabitProgress(h, colors)),
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-
-  Widget _miniStat(
-    String label,
-    String value,
-    Color color,
-    AppColorScheme colors,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeeklyBarChart(
-    Map<DateTime, int> weeklyTrend,
-    AppColorScheme colors,
-  ) {
-    final sortedDates = weeklyTrend.keys.toList()..sort();
-    final dataPoints = sortedDates
-        .map(
-          (date) => _BarData(
-            DateFormat('E').format(date)[0],
-            weeklyTrend[date]!.toDouble(),
-          ),
-        )
-        .toList();
-
-    return Container(
-      height: 200,
-      padding: const EdgeInsets.fromLTRB(10, 20, 20, 10),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: SfCartesianChart(
-        plotAreaBorderWidth: 0,
-        primaryXAxis: CategoryAxis(
-          majorGridLines: const MajorGridLines(width: 0),
-          axisLine: AxisLine(color: colors.border),
-          labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
         ),
-        primaryYAxis: NumericAxis(
-          majorGridLines: MajorGridLines(
-            color: colors.border.withOpacity(0.3),
-            dashArray: const [4, 4],
-          ),
-          axisLine: const AxisLine(width: 0),
-          labelStyle: TextStyle(color: colors.textMuted, fontSize: 10),
-        ),
-        series: <CartesianSeries>[
-          ColumnSeries<_BarData, String>(
-            dataSource: dataPoints,
-            xValueMapper: (_BarData d, _) => d.label,
-            yValueMapper: (_BarData d, _) => d.value,
-            color: colors.primary,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(6),
-              topRight: Radius.circular(6),
-            ),
-            width: 0.5,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHabitProgress(HabitDetailStats detail, AppColorScheme colors) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  detail.name,
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'SUCCESS RATE: ${(detail.completionRate * 100).toInt()}%',
-                  style: TextStyle(color: colors.textMuted, fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Column(
-                children: [
-                  Text(
-                    '${detail.currentStreak}',
-                    style: const TextStyle(
-                      color: Colors.orangeAccent,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const Text(
-                    'CURRENT',
-                    style: TextStyle(
-                      color: Colors.orangeAccent,
-                      fontSize: 7,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Column(
-                children: [
-                  Text(
-                    '${detail.bestStreak}',
-                    style: TextStyle(
-                      color: colors.primary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    'BEST',
-                    style: TextStyle(
-                      color: colors.primary,
-                      fontSize: 7,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Streak cards showing current and longest streak (shared by both tabs)
 Widget _buildStreakCards(
   int currentStreak,
   int longestStreak,
@@ -1177,12 +803,6 @@ class _TimeData {
   final DateTime date;
   final double value;
   _TimeData(this.date, this.value);
-}
-
-class _BarData {
-  final String label;
-  final double value;
-  _BarData(this.label, this.value);
 }
 
 class _MonthLabel {

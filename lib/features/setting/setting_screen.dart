@@ -41,23 +41,6 @@ class SettingScreen extends HookConsumerWidget {
             const SizedBox(height: 40),
             _sectionHeader('PREFERENCES', colors),
             const SizedBox(height: 16),
-            _buildToggleCard(
-              'Swap Challenges & Habit',
-              Icons.swap_horiz,
-              ref.watch(swapHomeAndChallengeProvider),
-              (val) =>
-                  ref.read(swapHomeAndChallengeProvider.notifier).state = val,
-              colors,
-            ),
-            const SizedBox(height: 12),
-            _buildToggleCard(
-              'Show Habit Calendar',
-              Icons.calendar_month,
-              ref.watch(showHabitCalendarProvider),
-              (val) => ref.read(showHabitCalendarProvider.notifier).state = val,
-              colors,
-            ),
-            const SizedBox(height: 12),
             _buildMaxChallengesDropdown(ref, colors),
             const SizedBox(height: 40),
             _sectionHeader('NOTIFICATIONS', colors),
@@ -86,47 +69,6 @@ class SettingScreen extends HookConsumerWidget {
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
         ),
-      ),
-    );
-  }
-
-  Widget _buildToggleCard(
-    String label,
-    IconData icon,
-    bool value,
-    Function(bool) onChanged,
-    AppColorScheme colors,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.border.withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: colors.textSecondary),
-              const SizedBox(width: 16),
-              Text(
-                label,
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: colors.primary,
-          ),
-        ],
       ),
     );
   }

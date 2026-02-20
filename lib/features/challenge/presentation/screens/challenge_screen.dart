@@ -6,7 +6,6 @@ import 'package:iron_mind/features/challenge/presentation/providers/challenge_pr
 import 'package:iron_mind/features/challenge/data/models/challenge_model.dart';
 import 'package:iron_mind/features/challenge/presentation/screens/challenge_detail_screen.dart';
 import 'package:iron_mind/features/intel/presentation/providers/stats_provider.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
 
 import 'package:iron_mind/features/challenge/presentation/screens/create_challenge_screen.dart';
 
@@ -87,7 +86,6 @@ class ChallengeScreen extends HookConsumerWidget {
                     padding: const EdgeInsets.all(20),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        _buildRadialProgress(stats, colors),
                         const SizedBox(height: 24),
                         if (visibleOngoing.isNotEmpty) ...[
                           _sectionHeader(
@@ -177,131 +175,6 @@ class ChallengeScreen extends HookConsumerWidget {
                 ],
               ),
       ),
-    );
-  }
-
-  /// Radial progress card — uses same stats provider as IntelScreen for consistency
-  Widget _buildRadialProgress(
-    ChallengeIntelStats stats,
-    AppColorScheme colors,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colors.border.withOpacity(0.5)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            height: 120,
-            width: 120,
-            child: SfCircularChart(
-              margin: EdgeInsets.zero,
-              annotations: <CircularChartAnnotation>[
-                CircularChartAnnotation(
-                  widget: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${(stats.overallCompletionRate * 100).toInt()}%',
-                        style: TextStyle(
-                          color: colors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        'TOTAL',
-                        style: TextStyle(color: colors.textMuted, fontSize: 8),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              series: <CircularSeries>[
-                DoughnutSeries<_PieData, String>(
-                  dataSource: [
-                    _PieData(
-                      'Completed',
-                      stats.overallCompletionRate * 100,
-                      colors.primary,
-                    ),
-                    _PieData(
-                      'Remaining',
-                      (1 - stats.overallCompletionRate) * 100,
-                      colors.progressBarBg,
-                    ),
-                  ],
-                  xValueMapper: (_PieData d, _) => d.label,
-                  yValueMapper: (_PieData d, _) => d.value,
-                  pointColorMapper: (_PieData d, _) => d.color,
-                  innerRadius: '75%',
-                  radius: '100%',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 30),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _statRow(
-                  'TOTAL',
-                  stats.totalChallenges.toString(),
-                  colors.textPrimary,
-                  colors,
-                ),
-                const SizedBox(height: 12),
-                _statRow(
-                  'COMPLETED',
-                  stats.completedChallenges.toString(),
-                  colors.primary,
-                  colors,
-                ),
-                const SizedBox(height: 12),
-                _statRow(
-                  'ONGOING',
-                  stats.ongoingChallenges.toString(),
-                  colors.accent,
-                  colors,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statRow(
-    String label,
-    String value,
-    Color valueColor,
-    AppColorScheme colors,
-  ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: colors.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
     );
   }
 

@@ -16,20 +16,14 @@ class CustomNavBar extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isSwapped = ref.watch(swapHomeAndChallengeProvider);
     final hasPhases = ref.watch(hasAnyPhasesProvider);
     final colors = Theme.of(context).appColors;
 
     // Build nav items dynamically — skip PHASES if no challenge has roadmap
     final items = <_NavItemData>[];
 
-    if (isSwapped) {
-      items.add(_NavItemData(Icons.military_tech_rounded, 'CHALLENGES'));
-      items.add(_NavItemData(Icons.grid_view_rounded, 'HABIT'));
-    } else {
-      items.add(_NavItemData(Icons.grid_view_rounded, 'HABIT'));
-      items.add(_NavItemData(Icons.military_tech_rounded, 'CHALLENGES'));
-    }
+    items.add(_NavItemData(Icons.grid_view_rounded, 'HOME'));
+    items.add(_NavItemData(Icons.military_tech_rounded, 'CHALLENGES'));
 
     if (hasPhases) {
       items.add(_NavItemData(Icons.calendar_today_rounded, 'PHASES'));

@@ -18,15 +18,6 @@ class AppColors {
   static const cardBgUpColor = Color(0xFF334155);
   static const textPrimaryBlack = Color(0xFF0F172A);
 
-  // --- Habit Screen New Colors (Blueish Scheme) ---
-  static const habitBg = Color(0xFF0F172A);
-  static const habitSurface = Color(0xFF1E293B);
-  static const habitPrimary = Color(0xFF2563EB); // Vibrant Blue
-  static const habitCategoryBlue = Color(0xFF3B82F6);
-  static const habitCategoryText = Colors.white;
-  static const habitIconGrey = Color(0xFF64748B);
-  static const habitBorder = Color(0xFF334155);
-
   static const lowPriorityColor = Color(0xFF10B981); // Emerald
   static const mediumPriorityColor = Color(0xFFF59E0B); // Amber
   static const highPriorityColor = Color(0xFFEF4444); // Red
