@@ -23,7 +23,6 @@ class CustomNavBar extends HookConsumerWidget {
     final items = <_NavItemData>[];
 
     items.add(_NavItemData(Icons.grid_view_rounded, 'HOME'));
-    items.add(_NavItemData(Icons.military_tech_rounded, 'CHALLENGES'));
 
     if (hasPhases) {
       items.add(_NavItemData(Icons.calendar_today_rounded, 'PHASES'));

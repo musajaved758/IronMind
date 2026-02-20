@@ -6,6 +6,7 @@ import 'package:iron_mind/features/challenge/presentation/providers/challenge_pr
 import 'package:iron_mind/features/challenge/data/models/challenge_model.dart';
 import 'package:iron_mind/features/challenge/presentation/screens/challenge_detail_screen.dart';
 import 'package:iron_mind/features/intel/presentation/providers/stats_provider.dart';
+import 'package:iron_mind/features/home/presentation/widgets/daily_summary_card.dart';
 
 import 'package:iron_mind/features/challenge/presentation/screens/create_challenge_screen.dart';
 
@@ -78,102 +79,106 @@ class ChallengeScreen extends HookConsumerWidget {
       ),
       body: SafeArea(
         top: false,
-        child: allChallenges.isEmpty
-            ? _buildEmptyState(colors)
-            : CustomScrollView(
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.all(20),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        const SizedBox(height: 24),
-                        if (visibleOngoing.isNotEmpty) ...[
-                          _sectionHeader(
-                            'ACTIVE MISSIONS (${visibleOngoing.length})',
-                            colors,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ]),
-                    ),
-                  ),
-                  if (visibleOngoing.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      sliver: SliverReorderableList(
-                        itemCount: visibleOngoing.length,
-                        onReorder: (oldIndex, newIndex) {
-                          ref
-                              .read(challengeProvider.notifier)
-                              .reorderChallenges(
-                                oldIndex,
-                                newIndex,
-                                visibleOngoing.map((c) => c.id).toList(),
-                              );
-                        },
-                        itemBuilder: (context, index) {
-                          final c = visibleOngoing[index];
-                          return ReorderableDelayedDragStartListener(
-                            key: ValueKey(c.id),
-                            index: index,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 20),
-                              child: _buildChallengeCard(
-                                context,
-                                ref,
-                                c,
-                                colors,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  SliverPadding(
-                    padding: const EdgeInsets.all(20),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        if (visibleOngoing.isEmpty && completed.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: Center(
-                              child: Text(
-                                'All missions completed!',
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        if (completed.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          _sectionHeader(
-                            'COMPLETED (${completed.length})',
-                            colors,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ]),
-                    ),
-                  ),
-                  if (completed.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final c = completed[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildCompletedCard(context, c, colors),
-                          );
-                        }, childCount: completed.length),
-                      ),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
-                ],
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+              sliver: SliverToBoxAdapter(
+                child: DailySummaryCard(
+                  selectedDate: ref.watch(selectedDateProvider),
+                ),
               ),
+            ),
+            if (allChallenges.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildEmptyState(colors),
+              )
+            else ...[
+              SliverPadding(
+                padding: const EdgeInsets.all(20),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    if (visibleOngoing.isNotEmpty) ...[
+                      _sectionHeader(
+                        'ACTIVE MISSIONS (${visibleOngoing.length})',
+                        colors,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ]),
+                ),
+              ),
+              if (visibleOngoing.isNotEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverReorderableList(
+                    itemCount: visibleOngoing.length,
+                    onReorder: (oldIndex, newIndex) {
+                      ref
+                          .read(challengeProvider.notifier)
+                          .reorderChallenges(
+                            oldIndex,
+                            newIndex,
+                            visibleOngoing.map((c) => c.id).toList(),
+                          );
+                    },
+                    itemBuilder: (context, index) {
+                      final c = visibleOngoing[index];
+                      return ReorderableDelayedDragStartListener(
+                        key: ValueKey(c.id),
+                        index: index,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: _buildChallengeCard(context, ref, c, colors),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              SliverPadding(
+                padding: const EdgeInsets.all(20),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    if (visibleOngoing.isEmpty && completed.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: Center(
+                          child: Text(
+                            'All missions completed!',
+                            style: TextStyle(
+                              color: colors.textMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (completed.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _sectionHeader('COMPLETED (${completed.length})', colors),
+                      const SizedBox(height: 16),
+                    ],
+                  ]),
+                ),
+              ),
+              if (completed.isNotEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final c = completed[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildCompletedCard(context, c, colors),
+                      );
+                    }, childCount: completed.length),
+                  ),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            ],
+          ],
+        ),
       ),
     );
   }

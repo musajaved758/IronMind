@@ -4,6 +4,7 @@ import 'package:iron_mind/core/widgets/custom_nav_bar.dart';
 import 'package:iron_mind/core/utils/barrels/screens.dart';
 import 'package:iron_mind/core/providers/app_providers.dart';
 import 'package:iron_mind/features/challenge/presentation/screens/challenge_screen.dart';
+// HomeScreen removed — ChallengeScreen serves as the home page
 
 class MainScreen extends HookConsumerWidget {
   const MainScreen({super.key});
@@ -16,7 +17,6 @@ class MainScreen extends HookConsumerWidget {
     // Build pages dynamically — skip PhaseScreen if no phases
     final pages = <Widget>[];
 
-    pages.add(const HomeScreen());
     pages.add(const ChallengeScreen());
 
     if (hasPhases) {
